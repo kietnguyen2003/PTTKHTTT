@@ -7,11 +7,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Filter, Calendar, Eye, RotateCcw } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Search, Filter, Calendar, Eye, RotateCcw, Clock, Plus } from "lucide-react"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function TraCuuLichThiPage() {
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null)
+  const [newExamData, setNewExamData] = useState({
+    tenChungChi: "",
+    ngayThi: "",
+    gioThi: "",
+    diaDiem: "",
+    phongThi: "",
+    sucChua: "",
+    giamThi: "",
+    ghiChu: "",
+  })
 
   // Mock data for exams
   const exams: Exam[] = [
@@ -76,10 +87,151 @@ export default function TraCuuLichThiPage() {
     setSelectedExam(exam)
   }
 
+  const handleInputChange = (field: string, value: string) => {
+    setNewExamData({
+      ...newExamData,
+      [field]: value,
+    })
+  }
+
+  const handleAddExam = () => {
+    // In a real application, this would be an API call to add a new exam
+    alert("Đã thêm lịch thi mới thành công!")
+    // Reset form
+    setNewExamData({
+      tenChungChi: "",
+      ngayThi: "",
+      gioThi: "",
+      diaDiem: "",
+      phongThi: "",
+      sucChua: "",
+      giamThi: "",
+      ghiChu: "",
+    })
+  }
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tra Cứu Lịch Thi</h1>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Thêm lịch thi
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Thêm lịch thi mới</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="tenChungChi">Loại chứng chỉ</Label>
+                <Select
+                  value={newExamData.tenChungChi}
+                  onValueChange={(value) => handleInputChange("tenChungChi", value)}
+                >
+                  <SelectTrigger id="tenChungChi">
+                    <SelectValue placeholder="Chọn loại chứng chỉ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Chứng chỉ Tiếng Anh B1">Chứng chỉ Tiếng Anh B1</SelectItem>
+                    <SelectItem value="Chứng chỉ Tiếng Anh B2">Chứng chỉ Tiếng Anh B2</SelectItem>
+                    <SelectItem value="Chứng chỉ Tin học cơ bản">Chứng chỉ Tin học cơ bản</SelectItem>
+                    <SelectItem value="Chứng chỉ Tin học nâng cao">Chứng chỉ Tin học nâng cao</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ngayThi">Ngày thi</Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="ngayThi"
+                      type="date"
+                      className="pl-8"
+                      value={newExamData.ngayThi}
+                      onChange={(e) => handleInputChange("ngayThi", e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gioThi">Giờ thi</Label>
+                  <div className="relative">
+                    <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="gioThi"
+                      type="time"
+                      className="pl-8"
+                      value={newExamData.gioThi}
+                      onChange={(e) => handleInputChange("gioThi", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="diaDiem">Tòa nhà</Label>
+                  <Input
+                    id="diaDiem"
+                    placeholder="Nhập tên tòa nhà"
+                    value={newExamData.diaDiem}
+                    onChange={(e) => handleInputChange("diaDiem", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phongThi">Phòng thi</Label>
+                  <Input
+                    id="phongThi"
+                    placeholder="Nhập số phòng"
+                    value={newExamData.phongThi}
+                    onChange={(e) => handleInputChange("phongThi", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sucChua">Sức chứa</Label>
+                <Input
+                  id="sucChua"
+                  type="number"
+                  placeholder="Nhập sức chứa phòng thi"
+                  value={newExamData.sucChua}
+                  onChange={(e) => handleInputChange("sucChua", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="giamThi">Giám thị</Label>
+                <Input
+                  id="giamThi"
+                  placeholder="Nhập tên giám thị (ngăn cách bằng dấu phẩy)"
+                  value={newExamData.giamThi}
+                  onChange={(e) => handleInputChange("giamThi", e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ghiChu">Ghi chú</Label>
+                <Textarea
+                  id="ghiChu"
+                  placeholder="Nhập ghi chú (nếu có)"
+                  value={newExamData.ghiChu}
+                  onChange={(e) => handleInputChange("ghiChu", e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline">Hủy</Button>
+              <Button onClick={handleAddExam}>Thêm lịch thi</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
