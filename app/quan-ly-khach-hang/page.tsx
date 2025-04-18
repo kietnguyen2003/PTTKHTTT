@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Search, Filter, UserPlus, Eye, Pencil, Trash2, Users } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import CustomerForm from "@/components/customer-form"
+import OrganizationForm from "@/components/organization-form"
 
 export default function QuanLyKhachHangPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -243,10 +244,26 @@ export default function QuanLyKhachHangPage() {
         </TabsContent>
 
         <TabsContent value="organization" className="space-y-4 pt-4">
+        <div className="flex items-center justify-between">
+          <CardHeader className="pb-3">
+                <CardTitle>Danh sách khách hàng đơn vị</CardTitle>
+              </CardHeader>
+              <Dialog>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <UserPlus className="h-4 w-4" />
+                Đăng ký đơn vị
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Đăng ký đơn vị mới</DialogTitle>
+              </DialogHeader>
+              <OrganizationForm />
+            </DialogContent>
+          </Dialog>
+        </div>
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Danh sách khách hàng đơn vị</CardTitle>
-            </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-1 items-center gap-2">
