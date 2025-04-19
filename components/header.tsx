@@ -1,8 +1,9 @@
-"use client"
+// PTTKHTTT/components/header.tsx
+"use client";
 
-import { Bell, Search, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Bell, Search, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,10 +11,25 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Session } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/supabaseClient";
 
-export default function Header() {
+interface HeaderProps {
+  session: Session | null; // Thêm prop session
+}
+
+export default function Header({ session }: HeaderProps) {
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
       <div className="hidden lg:block lg:w-[250px]"></div>
@@ -33,30 +49,38 @@ export default function Header() {
               3
             </span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src="/placeholder.svg" />
-                  <AvatarFallback>NV</AvatarFallback>
-                </Avatar>
-                <span className="hidden md:inline-flex">Nguyễn Văn A</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                Thông tin cá nhân
-              </DropdownMenuItem>
-              <DropdownMenuItem>Đổi mật khẩu</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Đăng xuất</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {session ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src="/placeholder.svg" />
+                    <AvatarFallback>
+                      {session.user.email?.charAt(0).toUpperCase() || "NV"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden md:inline-flex">{session.user.email}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
+                  Thông tin cá nhân
+                </DropdownMenuItem>
+                <DropdownMenuItem>Đổi mật khẩu</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>Đăng xuất</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="outline" size="sm" asChild>
+              <a href="/login">Đăng nhập</a>
+            </Button>
+          )}
         </div>
       </div>
     </header>
-  )
+  );
 }

@@ -1,40 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import {   useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Calendar } from "lucide-react"
+import {  Calendar } from "lucide-react"
+import { Customer } from "@/lib/customerService"
+import { CertificateList } from "@/lib/certificateService"
+import { DateList } from "@/lib/dateService"
 
-export default function CandidateForm() {
+export default function CandidateForm( { selectedCustomer, dateList, certificateList }: { selectedCustomer: Customer | null, dateList: DateList[], certificateList: CertificateList[] }) {
   const [showIndividualForm, setShowIndividualForm] = useState(true)
-
-  // Mock data for exam schedule
-  const examSchedules = [
-    {
-      id: "BT001",
-      time: "09:00 - 11:00, 15/05/2025",
-      location: "Phòng 101, Tòa nhà A",
-      capacity: 30,
-      status: "Chưa tổ chức",
-    },
-    {
-      id: "BT002",
-      time: "14:00 - 16:00, 15/05/2025",
-      location: "Phòng 102, Tòa nhà A",
-      capacity: 25,
-      status: "Chưa tổ chức",
-    },
-    {
-      id: "BT003",
-      time: "09:00 - 11:00, 16/05/2025",
-      location: "Phòng 201, Tòa nhà B",
-      capacity: 35,
-      status: "Chưa tổ chức",
-    },
-  ]
 
   return (
     <div className="space-y-4">
@@ -43,10 +21,7 @@ export default function CandidateForm() {
       <div className="space-y-2">
         <Label htmlFor="candidateId">Mã thí sinh</Label>
         <div className="flex gap-2">
-          <Input id="candidateId" placeholder="Nhập hoặc tra cứu mã thí sinh" />
-          <Button variant="outline" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
+          <Input value={selectedCustomer?.id} id="candidateId" disabled />
         </div>
         <p className="text-xs text-muted-foreground">Mã sẽ được tự động tạo nếu là thí sinh mới</p>
       </div>
@@ -55,7 +30,7 @@ export default function CandidateForm() {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="candidateName">Họ tên</Label>
-            <Input id="candidateName" placeholder="Nhập họ tên thí sinh" />
+            <Input value={selectedCustomer?.name} id="candidateName" disabled />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dob">Ngày sinh</Label>
@@ -97,10 +72,11 @@ export default function CandidateForm() {
             <SelectValue placeholder="Chọn loại chứng chỉ" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="cc001">Chứng chỉ Tiếng Anh B1</SelectItem>
-            <SelectItem value="cc002">Chứng chỉ Tiếng Anh B2</SelectItem>
-            <SelectItem value="cc003">Chứng chỉ Tin học cơ bản</SelectItem>
-            <SelectItem value="cc004">Chứng chỉ Tin học nâng cao</SelectItem>
+            {certificateList.map((certificate) => (
+              <SelectItem key={certificate.macc} value={certificate.macc}>
+                {certificate.tencc}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -124,13 +100,13 @@ export default function CandidateForm() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {examSchedules.map((schedule) => (
-                <TableRow key={schedule.id} className="cursor-pointer hover:bg-muted">
-                  <TableCell className="font-medium">{schedule.id}</TableCell>
-                  <TableCell>{schedule.time}</TableCell>
-                  <TableCell>{schedule.location}</TableCell>
-                  <TableCell className="text-center">{schedule.capacity}</TableCell>
-                  <TableCell className="text-center">{schedule.status}</TableCell>
+              {dateList.map((schedule) => (
+                <TableRow key={schedule.mabuoithi} className="cursor-pointer hover:bg-muted">
+                  <TableCell className="font-medium">{schedule.mabuoithi}</TableCell>
+                  <TableCell>{schedule.thoigian}</TableCell>
+                  <TableCell>{schedule.diadiem}</TableCell>
+                  <TableCell className="text-center">{schedule.soluongthisinh}</TableCell>
+                  <TableCell className="text-center">{schedule.trangthai}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

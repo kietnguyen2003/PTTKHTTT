@@ -1,10 +1,10 @@
-"use client"
+// src/components/sidebar.tsx
+"use client";
 
-import type React from "react"
-
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import type React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 import {
   BarChart3,
   ClipboardList,
@@ -13,72 +13,43 @@ import {
   Home,
   LogOut,
   Menu,
-  Settings,
-  Users,
-  X,
   UserCircle,
   PenLine,
   Receipt,
   CalendarDays,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useState } from "react"
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export default function Sidebar({ className }: SidebarProps) {
-  const pathname = usePathname()
-  const [open, setOpen] = useState(false)
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
 
-  const routes = [
-    {
-      href: "/",
-      icon: Home,
-      title: "Trang chủ",
-    },
-    {
-      href: "/quan-ly-khach-hang",
-      icon: UserCircle,
-      title: "Quản lý khách hàng",
-    },
-    {
-      href: "/dang-ky",
-      icon: ClipboardList,
-      title: "Đăng ký kiểm tra",
-    },
-    {
-      href: "/gia-han",
-      icon: Clock,
-      title: "Gia hạn thời gian thi",
-    },
-    {
-      href: "/nhap-ket-qua",
-      icon: PenLine,
-      title: "Nhập kết quả thi",
-    },
-    {
-      href: "/quan-ly-hoa-don",
-      icon: Receipt,
-      title: "Quản lý hóa đơn",
-    },
-    {
-      href: "/tra-cuu-lich-thi",
-      icon: CalendarDays,
-      title: "Tra cứu lịch thi",
-    },
-    {
-      href: "/quan-ly-phieu",
-      icon: FileText,
-      title: "Quản lý phiếu",
-    },
-    {
-      href: "/thong-ke",
-      icon: BarChart3,
-      title: "Thống kê báo cáo",
-    },
-  ]
+  const routes = user
+    ? [
+        { href: "/", icon: Home, title: "Trang chủ" },
+        { href: "/quan-ly-khach-hang", icon: UserCircle, title: "Quản lý khách hàng" },
+        { href: "/dang-ky", icon: ClipboardList, title: "Đăng ký kiểm tra" },
+        { href: "/gia-han", icon: Clock, title: "Gia hạn thời gian thi" },
+        { href: "/nhap-ket-qua", icon: PenLine, title: "Nhập kết quả thi" },
+        { href: "/quan-ly-hoa-don", icon: Receipt, title: "Quản lý hóa đơn" },
+        { href: "/tra-cuu-lich-thi", icon: CalendarDays, title: "Tra cứu lịch thi" },
+        { href: "/quan-ly-phieu", icon: FileText, title: "Quản lý phiếu" },
+        { href: "/thong-ke", icon: BarChart3, title: "Thống kê báo cáo" },
+      ]
+    : [
+        { href: "/", icon: Home, title: "Trang chủ" },
+        { href: "/login", icon: UserCircle, title: "Đăng nhập" },
+      ];
 
   return (
     <>
@@ -89,7 +60,7 @@ export default function Sidebar({ className }: SidebarProps) {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0">
-          <MobileSidebar routes={routes} pathname={pathname} setOpen={setOpen} />
+          <MobileSidebar routes={routes} pathname={pathname} setOpen={setOpen} isAuthenticated={!!user} signOut={signOut} />
         </SheetContent>
       </Sheet>
 
@@ -109,7 +80,7 @@ export default function Sidebar({ className }: SidebarProps) {
                   href={route.href}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                    pathname === route.href ? "bg-accent text-accent-foreground" : "transparent",
+                    pathname === route.href ? "bg-accent text-accent-foreground" : "transparent"
                   )}
                 >
                   <route.icon className="h-5 w-5" />
@@ -119,28 +90,47 @@ export default function Sidebar({ className }: SidebarProps) {
             </nav>
           </ScrollArea>
           <div className="mt-auto border-t p-4">
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <LogOut className="h-4 w-4" />
-              Đăng xuất
-            </Button>
+            {loading ? (
+              <p>Đang tải...</p>
+            ) : user ? (
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={async () => {
+                  await signOut();
+                  router.push("/login");
+                  router.refresh();
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng xuất
+              </Button>
+            ) : (
+              <Button variant="outline" className="w-full justify-start gap-2" asChild>
+                <Link href="/login">
+                  <UserCircle className="h-4 w-4" />
+                  Đăng nhập
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>
     </>
-  )
+  );
 }
 
 interface MobileSidebarProps {
-  routes: {
-    href: string
-    icon: React.ElementType
-    title: string
-  }[]
-  pathname: string
-  setOpen: (open: boolean) => void
+  routes: { href: string; icon: React.ElementType; title: string }[];
+  pathname: string;
+  setOpen: (open: boolean) => void;
+  isAuthenticated: boolean;
+  signOut: () => Promise<void>;
 }
 
-function MobileSidebar({ routes, pathname, setOpen }: MobileSidebarProps) {
+function MobileSidebar({ routes, pathname, setOpen, isAuthenticated, signOut }: MobileSidebarProps) {
+  const router = useRouter();
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center justify-between border-b px-6">
@@ -161,7 +151,7 @@ function MobileSidebar({ routes, pathname, setOpen }: MobileSidebarProps) {
               onClick={() => setOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground",
-                pathname === route.href ? "bg-accent text-accent-foreground" : "transparent",
+                pathname === route.href ? "bg-accent text-accent-foreground" : "transparent"
               )}
             >
               <route.icon className="h-5 w-5" />
@@ -171,11 +161,28 @@ function MobileSidebar({ routes, pathname, setOpen }: MobileSidebarProps) {
         </nav>
       </ScrollArea>
       <div className="mt-auto border-t p-4">
-        <Button variant="outline" className="w-full justify-start gap-2">
-          <LogOut className="h-4 w-4" />
-          Đăng xuất
-        </Button>
+        {isAuthenticated ? (
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={async () => {
+              await signOut();
+              router.push("/login");
+              router.refresh();
+            }}
+          >
+            <LogOut className="h-4 w-4" />
+            Đăng xuất
+          </Button>
+        ) : (
+          <Button variant="outline" className="w-full justify-start gap-2" asChild>
+            <Link href="/login">
+              <UserCircle className="h-4 w-4" />
+              Đăng nhập
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
-  )
+  );
 }

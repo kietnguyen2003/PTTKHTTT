@@ -1,149 +1,89 @@
-"use client"
+// src/app/quan-ly-khach-hang/page.tsx
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Search, Filter, UserPlus, Eye, Pencil, Trash2, Users } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import CustomerForm from "@/components/customer-form"
-import OrganizationForm from "@/components/organization-form"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Search, Filter, UserPlus, Eye, Pencil, Trash2, Users } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import CustomerForm from "@/components/customer-form";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { toast } from "@/components/ui/use-toast";
+import { fetchIndividualCustomers, fetchOrganizationCustomers } from "@/lib/customerService";
 
 export default function QuanLyKhachHangPage() {
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [showCustomerDetails, setShowCustomerDetails] = useState(false)
+  const [individualCustomers, setIndividualCustomers] = useState<Customer[]>([]);
+  const [organizationCustomers, setOrganizationCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  // Mock data for individual customers
-  const individualCustomers: Customer[] = [
-    {
-      id: "KH001",
-      type: "individual",
-      name: "Nguyễn Văn A",
-      idCard: "012345678901",
-      email: "nguyenvana@example.com",
-      phone: "0901234567",
-      registrations: [
-        {
-          id: "PDK001",
-          examDate: "15/05/2025",
-          certificate: "Chứng chỉ Tiếng Anh B1",
-          status: "Đã duyệt",
-          createdAt: "10/04/2025",
-        },
-        {
-          id: "PDK005",
-          examDate: "22/05/2025",
-          certificate: "Chứng chỉ Tin học cơ bản",
-          status: "Chờ duyệt",
-          createdAt: "15/04/2025",
-        },
-      ],
-    },
-    {
-      id: "KH002",
-      type: "individual",
-      name: "Trần Thị B",
-      idCard: "012345678902",
-      email: "tranthib@example.com",
-      phone: "0901234568",
-      registrations: [
-        {
-          id: "PDK003",
-          examDate: "15/05/2025",
-          certificate: "Chứng chỉ Tiếng Anh B2",
-          status: "Đã duyệt",
-          createdAt: "12/04/2025",
-        },
-      ],
-    },
-    {
-      id: "KH003",
-      type: "individual",
-      name: "Lê Văn C",
-      idCard: "012345678903",
-      email: "levanc@example.com",
-      phone: "0901234569",
-      registrations: [
-        {
-          id: "PDK004",
-          examDate: "17/05/2025",
-          certificate: "Chứng chỉ Tin học nâng cao",
-          status: "Đã duyệt",
-          createdAt: "13/04/2025",
-        },
-      ],
-    },
-    {
-      id: "KH004",
-      type: "individual",
-      name: "Phạm Thị D",
-      idCard: "012345678904",
-      email: "phamthid@example.com",
-      phone: "0901234570",
-      registrations: [],
-    },
-    {
-      id: "KH005",
-      type: "individual",
-      name: "Hoàng Văn E",
-      idCard: "012345678905",
-      email: "hoangvane@example.com",
-      phone: "0901234571",
-      registrations: [],
-    },
-  ]
 
-  // Mock data for organization customers
-  const organizationCustomers: Customer[] = [
-    {
-      id: "KH006",
-      type: "organization",
-      name: "Công ty XYZ",
-      orgId: "MST12345",
-      phone: "0901234572",
-      registrations: [
-        {
-          id: "PDK002",
-          examDate: "16/05/2025",
-          certificate: "Chứng chỉ Tin học cơ bản",
-          status: "Chờ duyệt",
-          createdAt: "11/04/2025",
-        },
-      ],
-    },
-    {
-      id: "KH007",
-      type: "organization",
-      name: "Công ty ABC",
-      orgId: "MST12346",
-      phone: "0901234573",
-      registrations: [
-        {
-          id: "PDK006",
-          examDate: "18/05/2025",
-          certificate: "Chứng chỉ Tiếng Anh B1",
-          status: "Chờ duyệt",
-          createdAt: "14/04/2025",
-        },
-      ],
-    },
-    {
-      id: "KH008",
-      type: "organization",
-      name: "Trường Đại học DEF",
-      orgId: "MST12347",
-      phone: "0901234574",
-      registrations: [],
-    },
-  ]
 
+  // Hàm xóa khách hàng
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      const { error } = await supabase.from("khachhang").delete().eq("makh", customerId);
+      if (error) throw error;
+
+      setIndividualCustomers((prev) => prev.filter((c) => c.id !== customerId));
+      setOrganizationCustomers((prev) => prev.filter((c) => c.id !== customerId));
+      toast({ title: "Thành công", description: "Đã xóa khách hàng" });
+    } catch (error: any) {
+      console.error("Error deleting customer:", error.message, error);
+      toast({ title: "Lỗi", description: `Không thể xóa khách hàng: ${error.message}`, variant: "destructive" });
+    }
+  };
+
+  // Hàm xử lý xem chi tiết khách hàng
   const handleViewCustomer = (customer: Customer) => {
-    setSelectedCustomer(customer)
-    setShowCustomerDetails(true)
-  }
+    setSelectedCustomer(customer);
+    setShowCustomerDetails(true);
+  };
+
+  const filterCustomers = (customers: Customer[]) => {
+    return customers.filter((customer) => {
+      const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) || customer.id.includes(searchTerm);
+      const matchesFilter =
+        filterStatus === "all" ||
+        (filterStatus === "registered" && customer.registrations.length > 0) ||
+        (filterStatus === "not-registered" && customer.registrations.length === 0);
+      return matchesSearch && matchesFilter;
+    });
+  };
+  
+  const filteredIndividualCustomers = filterCustomers(individualCustomers);
+  const filteredOrganizationCustomers = filterCustomers(organizationCustomers);
+  
+
+  
+
+
+
+
+  // Tải dữ liệu khi component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        await fetchIndividualCustomers(setIndividualCustomers);
+        await fetchOrganizationCustomers(setOrganizationCustomers);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast({ title: "Lỗi", description: "Không thể tải danh sách khách hàng", variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+  
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -160,175 +100,185 @@ export default function QuanLyKhachHangPage() {
             <DialogHeader>
               <DialogTitle>Đăng ký người dùng mới</DialogTitle>
             </DialogHeader>
-            <CustomerForm />
+            <CustomerForm/>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Tabs defaultValue="individual">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="individual">Khách hàng cá nhân</TabsTrigger>
-          <TabsTrigger value="organization">Khách hàng đơn vị</TabsTrigger>
-        </TabsList>
+      {loading ? (
+        <p>Đang tải dữ liệu...</p>
+      ) : (
+        <Tabs defaultValue="individual">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="individual">Khách hàng cá nhân</TabsTrigger>
+            <TabsTrigger value="organization">Khách hàng đơn vị</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="individual" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Danh sách khách hàng cá nhân</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input type="search" placeholder="Tìm kiếm khách hàng..." className="w-full pl-8 md:w-[300px]" />
+          <TabsContent value="individual" className="space-y-4 pt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle>Danh sách khách hàng cá nhân</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-1 items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Tìm kiếm khách hàng..."
+                        className="w-full pl-8 md:w-[300px]"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="w-[180px]">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4" />
+                          <SelectValue placeholder="Trạng thái" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="registered">Đã đăng ký</SelectItem>
+                        <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4" />
-                        <SelectValue placeholder="Trạng thái" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="registered">Đã đăng ký</SelectItem>
-                      <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
-              </div>
 
-              <div className="mt-4 rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mã KH</TableHead>
-                      <TableHead>Họ tên</TableHead>
-                      <TableHead>CCCD</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Số điện thoại</TableHead>
-                      <TableHead>Số lượng đăng ký</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {individualCustomers.map((customer) => (
-                      <TableRow key={customer.id} className="cursor-pointer hover:bg-muted">
-                        <TableCell className="font-medium">{customer.id}</TableCell>
-                        <TableCell>{customer.name}</TableCell>
-                        <TableCell>{customer.idCard}</TableCell>
-                        <TableCell>{customer.email}</TableCell>
-                        <TableCell>{customer.phone}</TableCell>
-                        <TableCell>{customer.registrations.length}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleViewCustomer(customer)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="mt-4 rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mã KH</TableHead>
+                        <TableHead>Họ tên</TableHead>
+                        <TableHead>CCCD</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Số điện thoại</TableHead>
+                        <TableHead>Số lượng đăng ký</TableHead>
+                        <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredIndividualCustomers.map((customer) => (
+                        <TableRow key={customer.id} className="cursor-pointer hover:bg-muted">
+                          <TableCell className="font-medium">{customer.id}</TableCell>
+                          <TableCell>{customer.name}</TableCell>
+                          <TableCell>{customer.idCard}</TableCell>
+                          <TableCell>{customer.email}</TableCell>
+                          <TableCell>{customer.phone}</TableCell>
+                          <TableCell>{customer.registrations.length}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => handleViewCustomer(customer)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteCustomer(customer.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="organization" className="space-y-4 pt-4">
-        <div className="flex items-center justify-between">
-          <CardHeader className="pb-3">
+          <TabsContent value="organization" className="space-y-4 pt-4">              
+            <Card>
+            <CardHeader className="pb-3">
                 <CardTitle>Danh sách khách hàng đơn vị</CardTitle>
               </CardHeader>
-              <Dialog>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <UserPlus className="h-4 w-4" />
-                Đăng ký đơn vị
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Đăng ký đơn vị mới</DialogTitle>
-              </DialogHeader>
-              <OrganizationForm />
-            </DialogContent>
-          </Dialog>
-        </div>
-          <Card>
-            <CardContent>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input type="search" placeholder="Tìm kiếm khách hàng..." className="w-full pl-8 md:w-[300px]" />
+              <CardContent>
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-1 items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Tìm kiếm khách hàng..."
+                        className="w-full pl-8 md:w-[300px]"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger className="w-[180px]">
+                        <div className="flex items-center gap-2">
+                          <Filter className="h-4 w-4" />
+                          <SelectValue placeholder="Trạng thái" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        <SelectItem value="registered">Đã đăng ký</SelectItem>
+                        <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-[180px]">
-                      <div className="flex items-center gap-2">
-                        <Filter className="h-4 w-4" />
-                        <SelectValue placeholder="Trạng thái" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tất cả</SelectItem>
-                      <SelectItem value="registered">Đã đăng ký</SelectItem>
-                      <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
-              </div>
 
-              <div className="mt-4 rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mã KH</TableHead>
-                      <TableHead>Tên đơn vị</TableHead>
-                      <TableHead>Mã đơn vị</TableHead>
-                      <TableHead>Số điện thoại</TableHead>
-                      <TableHead>Số lượng đăng ký</TableHead>
-                      <TableHead className="text-right">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {organizationCustomers.map((customer) => (
-                      <TableRow key={customer.id} className="cursor-pointer hover:bg-muted">
-                        <TableCell className="font-medium">{customer.id}</TableCell>
-                        <TableCell>{customer.name}</TableCell>
-                        <TableCell>{customer.orgId}</TableCell>
-                        <TableCell>{customer.phone}</TableCell>
-                        <TableCell>{customer.registrations.length}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleViewCustomer(customer)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="mt-4 rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Mã KH</TableHead>
+                        <TableHead>Tên đơn vị</TableHead>
+                        <TableHead>Mã đơn vị</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Số điện thoại</TableHead>
+                        <TableHead>Số lượng đăng ký</TableHead>
+                        <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOrganizationCustomers.map((customer) => (
+                        <TableRow key={customer.id} className="cursor-pointer hover:bg-muted">
+                          <TableCell className="font-medium">{customer.id}</TableCell>
+                          <TableCell>{customer.name}</TableCell>
+                          <TableCell>{customer.orgId}</TableCell>
+                          <TableCell>{customer.email}</TableCell>
+                          <TableCell>{customer.phone}</TableCell>
+                          <TableCell>{customer.registrations.length}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => handleViewCustomer(customer)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteCustomer(customer.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
 
       {/* Customer Details Dialog */}
       <Dialog open={showCustomerDetails} onOpenChange={setShowCustomerDetails}>
@@ -444,25 +394,25 @@ export default function QuanLyKhachHangPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
 
 // Types
 interface Registration {
-  id: string
-  examDate: string
-  certificate: string
-  status: string
-  createdAt: string
+  id: string;
+  examDate: string;
+  certificate: string;
+  status: string;
+  createdAt: string;
 }
 
 interface Customer {
-  id: string
-  type: "individual" | "organization"
-  name: string
-  phone: string
-  idCard?: string
-  email?: string
-  orgId?: string
-  registrations: Registration[]
+  id: string;
+  type: "individual" | "organization";
+  name: string;
+  phone: string;
+  idCard?: string;
+  email?: string;
+  orgId?: string;
+  registrations: Registration[];
 }
