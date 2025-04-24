@@ -1,4 +1,3 @@
-// lib/customerService.ts
 import { supabase } from "./supabase/supabaseClient";
 
 // Định nghĩa interface cho dữ liệu từ Supabase
@@ -21,6 +20,7 @@ interface SupabaseCustomer {
   phieudangki: {
     maphieu: string;
     ngaydangky: string;
+    trangthai: string;
     buoithi: {
       thoigian: string;
       thongtinchungchi: {
@@ -83,6 +83,7 @@ export async function fetchIndividualCustomers(setCustomers: (customers: Custome
       phieudangki (
         maphieu,
         ngaydangky,
+        trangthai,
         buoithi (
           thoigian,
           thongtinchungchi (
@@ -97,6 +98,8 @@ export async function fetchIndividualCustomers(setCustomers: (customers: Custome
     console.error('Error fetching individual customers:', error.message);
     throw error;
   }
+
+  console.log("data", data);
 
   // Loại bỏ trùng lặp dựa trên makh
   const uniqueData = Array.from(new Map((data as SupabaseCustomer[]).map(item => [item.makh, item])).values());
@@ -115,7 +118,7 @@ export async function fetchIndividualCustomers(setCustomers: (customers: Custome
       maphieu: pdk.maphieu,
       ngaythi: pdk.buoithi.thoigian,
       tencc: pdk.buoithi.thongtinchungchi.tencc,
-      trangthai: 'Đã duyệt', // Có thể thêm logic để xác định trạng thái
+      trangthai: pdk.trangthai,
       ngaydangky: pdk.ngaydangky,
     })),
   }));
@@ -139,6 +142,7 @@ export async function fetchOrganizationCustomers(setCustomers: (customers: Custo
       phieudangki (
         maphieu,
         ngaydangky,
+        trangthai,
         buoithi (
           thoigian,
           thongtinchungchi (
@@ -171,7 +175,7 @@ export async function fetchOrganizationCustomers(setCustomers: (customers: Custo
       maphieu: pdk.maphieu,
       ngaythi: pdk.buoithi.thoigian,
       tencc: pdk.buoithi.thongtinchungchi.tencc,
-      trangthai: 'Đã duyệt',
+      trangthai: pdk.trangthai,
       ngaydangky: pdk.ngaydangky,
     })),
   }));

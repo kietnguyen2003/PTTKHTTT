@@ -1,4 +1,3 @@
-// src/app/quan-ly-khach-hang/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,10 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter, // Thêm DialogFooter để chứa các nút
-  DialogDescription, // Thêm DialogDescription để hiển thị mô tả
+  DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
-import { Search, Filter, UserPlus, Eye, Pencil, Trash2, Users } from 'lucide-react';
+import { Search, Filter, UserPlus, Eye, Pencil, Trash2, Users, CheckCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -29,18 +28,56 @@ import { supabase } from '@/lib/supabase/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
 import { Customer, fetchIndividualCustomers, fetchOrganizationCustomers } from '@/lib/customerService';
 
+// Hàm xác định trạng thái tổng hợp của khách hàng
+const getCustomerStatus = (registrations: any[]): string => {
+  console.log("registrations:", registrations);
+  if (registrations.length === 0) return 'Chưa đăng ký';
+  if (registrations.some((reg) => reg.trangthai === 'Đã duyệt')) return 'Đã duyệt';
+  if (registrations.some((reg) => reg.trangthai === 'Chờ duyệt')) return 'Chờ duyệt';
+  return 'Từ chối';
+};
+
+// Hàm cập nhật trạng thái phiếu đăng ký
+const updateRegistrationFormStatus = async (id: string, newStatus: string) => {
+  try {
+    const { error } = await supabase
+      .from('phieudangki')
+      .update({ trangthai: newStatus })
+      .eq('maphieu', id);
+
+    if (error) throw error;
+
+    toast({ 
+      title: 'Thành công', 
+      description: `Cập nhật trạng thái phiếu đăng ký ${id} thành công!` 
+    });
+  } catch (error: any) {
+    console.error('Error updating registration form status:', error);
+    toast({
+      title: 'Lỗi',
+      description: `Không thể cập nhật trạng thái phiếu đăng ký: ${error.message || "Lỗi không xác định"}`,
+      variant: 'destructive',
+    });
+  }
+};
+
 export default function QuanLyKhachHangPage() {
   const [individualCustomers, setIndividualCustomers] = useState<Customer[]>([]);
   const [organizationCustomers, setOrganizationCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null); // Thêm state để lưu khách hàng cần xóa
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // Thêm state để hiển thị dialog xác nhận
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [refresh, setRefresh] = useState(0);
+
+  // State cho dialog duyệt trạng thái
+  const [editStatusDialogOpen, setEditStatusDialogOpen] = useState(false);
+  const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
+  const [newStatus, setNewStatus] = useState<string>('');
 
   const handleRefresh = () => {
     setRefresh((prev) => prev + 1);
@@ -109,12 +146,13 @@ export default function QuanLyKhachHangPage() {
   };
 
   const handleConfirmDelete = (customer: Customer) => {
-    setCustomerToDelete(customer); // Lưu thông tin khách hàng cần xóa
-    setShowDeleteConfirm(true); // Hiển thị dialog xác nhận
+    setCustomerToDelete(customer);
+    setShowDeleteConfirm(true);
   };
 
   const handleViewCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
+    console.log("customer", customer);
     setShowCustomerDetails(true);
   };
 
@@ -123,15 +161,73 @@ export default function QuanLyKhachHangPage() {
     setShowEditForm(true);
   };
 
+  // Hàm mở dialog duyệt trạng thái
+  const handleOpenEditStatusDialog = (registrationId: string, currentStatus: string) => {
+    setEditingRegistrationId(registrationId);
+    setNewStatus(currentStatus);
+    setEditStatusDialogOpen(true);
+  };
+
+  // Hàm lưu trạng thái mới
+  const handleSaveStatus = async () => {
+    if (!editingRegistrationId) return;
+
+    await updateRegistrationFormStatus(editingRegistrationId, newStatus);
+
+    // Cập nhật trạng thái trong selectedCustomer
+    setSelectedCustomer((prev) => {
+      if (!prev) return prev;
+      const updatedRegistrations = prev.registrations.map((reg) =>
+        reg.maphieu === editingRegistrationId ? { ...reg, trangthai: newStatus } : reg
+      );
+      return { ...prev, registrations: updatedRegistrations };
+    });
+
+    // Cập nhật danh sách khách hàng để phản ánh thay đổi trạng thái tổng hợp
+    setIndividualCustomers((prev) =>
+      prev.map((customer) =>
+        customer.makh === selectedCustomer?.makh
+          ? {
+              ...customer,
+              registrations: customer.registrations.map((reg) =>
+                reg.maphieu === editingRegistrationId ? { ...reg, trangthai: newStatus } : reg
+              ),
+            }
+          : customer
+      )
+    );
+    setOrganizationCustomers((prev) =>
+      prev.map((customer) =>
+        customer.makh === selectedCustomer?.makh
+          ? {
+              ...customer,
+              registrations: customer.registrations.map((reg) =>
+                reg.maphieu === editingRegistrationId ? { ...reg, trangthai: newStatus } : reg
+              ),
+            }
+          : customer
+      )
+    );
+
+    setEditStatusDialogOpen(false);
+    setEditingRegistrationId(null);
+    setNewStatus('');
+  };
+
   const filterCustomers = (customers: Customer[]) => {
     return customers.filter((customer) => {
       const matchesSearch =
         (customer.hoten || customer.tendv || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.makh.includes(searchTerm);
+      
+      const customerStatus = getCustomerStatus(customer.registrations);
       const matchesFilter =
         filterStatus === 'all' ||
-        (filterStatus === 'registered' && customer.registrations.length > 0) ||
-        (filterStatus === 'not-registered' && customer.registrations.length === 0);
+        (filterStatus === 'approved' && customerStatus === 'Đã duyệt') ||
+        (filterStatus === 'pending' && customerStatus === 'Chờ duyệt') ||
+        (filterStatus === 'rejected' && customerStatus === 'Từ chối') ||
+        (filterStatus === 'not-registered' && customerStatus === 'Chưa đăng ký');
+      
       return matchesSearch && matchesFilter;
     });
   };
@@ -211,7 +307,9 @@ export default function QuanLyKhachHangPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Tất cả</SelectItem>
-                        <SelectItem value="registered">Đã đăng ký</SelectItem>
+                        <SelectItem value="approved">Đã duyệt</SelectItem>
+                        <SelectItem value="pending">Chờ duyệt</SelectItem>
+                        <SelectItem value="rejected">Từ chối</SelectItem>
                         <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
                       </SelectContent>
                     </Select>
@@ -227,53 +325,73 @@ export default function QuanLyKhachHangPage() {
                         <TableHead>CCCD</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Số điện thoại</TableHead>
+                        <TableHead>Trạng thái</TableHead>
                         <TableHead>Số lượng đăng ký</TableHead>
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredIndividualCustomers.length > 0 ? (
-                        filteredIndividualCustomers.map((customer, index) => (
-                          <TableRow
-                            key={customer.makh || `individual-${index}`}
-                            className="cursor-pointer hover:bg-muted"
-                          >
-                            <TableCell className="font-medium">{customer.makh}</TableCell>
-                            <TableCell>{customer.hoten || 'N/A'}</TableCell>
-                            <TableCell>{customer.cccd || 'N/A'}</TableCell>
-                            <TableCell>{customer.email || 'N/A'}</TableCell>
-                            <TableCell>{customer.sdt || 'N/A'}</TableCell>
-                            <TableCell>{customer.registrations.length}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewCustomer(customer)}
+                        filteredIndividualCustomers.map((customer, index) => {
+                          const customerStatus = getCustomerStatus(customer.registrations);
+                          console.log("customer:", customer);
+                          return (
+                            <TableRow
+                              key={customer.makh || `individual-${index}`}
+                              className="cursor-pointer hover:bg-muted"
+                            >
+                              <TableCell className="font-medium">{customer.makh}</TableCell>
+                              <TableCell>{customer.hoten || 'N/A'}</TableCell>
+                              <TableCell>{customer.cccd || 'N/A'}</TableCell>
+                              <TableCell>{customer.email || 'N/A'}</TableCell>
+                              <TableCell>{customer.sdt || 'N/A'}</TableCell>
+                              <TableCell>
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    customerStatus === 'Đã duyệt'
+                                      ? 'bg-green-100 text-green-800'
+                                      : customerStatus === 'Chờ duyệt'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : customerStatus === 'Từ chối'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}
                                 >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditCustomer(customer)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleConfirmDelete(customer)} // Sửa để hiển thị dialog xác nhận
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                  {customerStatus}
+                                </span>
+                              </TableCell>
+                              <TableCell>{customer.registrations.length}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewCustomer(customer)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditCustomer(customer)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleConfirmDelete(customer)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center">
+                          <TableCell colSpan={8} className="text-center">
                             Không có khách hàng cá nhân nào
                           </TableCell>
                         </TableRow>
@@ -312,7 +430,9 @@ export default function QuanLyKhachHangPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Tất cả</SelectItem>
-                        <SelectItem value="registered">Đã đăng ký</SelectItem>
+                        <SelectItem value="approved">Đã duyệt</SelectItem>
+                        <SelectItem value="pending">Chờ duyệt</SelectItem>
+                        <SelectItem value="rejected">Từ chối</SelectItem>
                         <SelectItem value="not-registered">Chưa đăng ký</SelectItem>
                       </SelectContent>
                     </Select>
@@ -328,53 +448,72 @@ export default function QuanLyKhachHangPage() {
                         <TableHead>Mã đơn vị</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Số điện thoại</TableHead>
+                        <TableHead>Trạng thái</TableHead>
                         <TableHead>Số lượng đăng ký</TableHead>
                         <TableHead className="text-right">Thao tác</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredOrganizationCustomers.length > 0 ? (
-                        filteredOrganizationCustomers.map((customer, index) => (
-                          <TableRow
-                            key={customer.makh || `organization-${index}`}
-                            className="cursor-pointer hover:bg-muted"
-                          >
-                            <TableCell className="font-medium">{customer.makh}</TableCell>
-                            <TableCell>{customer.tendv || 'N/A'}</TableCell>
-                            <TableCell>{customer.madv || 'N/A'}</TableCell>
-                            <TableCell>{customer.email || 'N/A'}</TableCell>
-                            <TableCell>{customer.sdt || 'N/A'}</TableCell>
-                            <TableCell>{customer.registrations.length}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleViewCustomer(customer)}
+                        filteredOrganizationCustomers.map((customer, index) => {
+                          const customerStatus = getCustomerStatus(customer.registrations);
+                          return (
+                            <TableRow
+                              key={customer.makh || `organization-${index}`}
+                              className="cursor-pointer hover:bg-muted"
+                            >
+                              <TableCell className="font-medium">{customer.makh}</TableCell>
+                              <TableCell>{customer.tendv || 'N/A'}</TableCell>
+                              <TableCell>{customer.madv || 'N/A'}</TableCell>
+                              <TableCell>{customer.email || 'N/A'}</TableCell>
+                              <TableCell>{customer.sdt || 'N/A'}</TableCell>
+                              <TableCell>
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    customerStatus === 'Đã duyệt'
+                                      ? 'bg-green-100 text-green-800'
+                                      : customerStatus === 'Chờ duyệt'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : customerStatus === 'Từ chối'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}
                                 >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditCustomer(customer)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleConfirmDelete(customer)} // Sửa để hiển thị dialog xác nhận
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
+                                  {customerStatus}
+                                </span>
+                              </TableCell>
+                              <TableCell>{customer.registrations.length}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleViewCustomer(customer)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleEditCustomer(customer)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleConfirmDelete(customer)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center">
+                          <TableCell colSpan={8} className="text-center">
                             Không có khách hàng đơn vị nào
                           </TableCell>
                         </TableRow>
@@ -463,6 +602,7 @@ export default function QuanLyKhachHangPage() {
                             <TableHead>Chứng chỉ</TableHead>
                             <TableHead>Trạng thái</TableHead>
                             <TableHead>Ngày đăng ký</TableHead>
+                            <TableHead className="text-right">Thao tác</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -476,13 +616,24 @@ export default function QuanLyKhachHangPage() {
                                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                     registration.trangthai === 'Đã duyệt'
                                       ? 'bg-green-100 text-green-800'
-                                      : 'bg-yellow-100 text-yellow-800'
+                                      : registration.trangthai === 'Chờ duyệt'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
                                   }`}
                                 >
                                   {registration.trangthai}
                                 </span>
                               </TableCell>
                               <TableCell>{new Date(registration.ngaydangky).toLocaleDateString()}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenEditStatusDialog(registration.maphieu, registration.trangthai)}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -568,6 +719,39 @@ export default function QuanLyKhachHangPage() {
             >
               Xóa
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog duyệt trạng thái */}
+      <Dialog open={editStatusDialogOpen} onOpenChange={setEditStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Duyệt trạng thái phiếu đăng ký</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <strong>Mã phiếu:</strong> {editingRegistrationId}
+            </div>
+            <div>
+              <strong>Trạng thái mới:</strong>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger className="w-full mt-2">
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Đã duyệt">Đã duyệt</SelectItem>
+                  <SelectItem value="Chờ duyệt">Chờ duyệt</SelectItem>
+                  <SelectItem value="Từ chối">Từ chối</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditStatusDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleSaveStatus}>Lưu</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
