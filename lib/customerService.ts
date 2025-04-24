@@ -1,134 +1,180 @@
 // lib/customerService.ts
-
 import { supabase } from "./supabase/supabaseClient";
-import { toast } from "react-toastify";
 
-// Định nghĩa interface
+// Định nghĩa interface cho dữ liệu từ Supabase
+interface SupabaseCustomer {
+  makh: string;
+  loaikh: 'CaNhan' | 'DonVi';
+  diachi?: string;
+  khachhang_cn?: {
+    hoten: string;
+    cccd?: string;
+    email?: string;
+    sdt?: string;
+  };
+  khachhang_dv?: {
+    tendv: string;
+    madv: string;
+    email?: string;
+    sdt?: string;
+  };
+  phieudangki: {
+    maphieu: string;
+    ngaydangky: string;
+    buoithi: {
+      thoigian: string;
+      thongtinchungchi: {
+        tencc: string;
+      };
+    };
+  }[];
+}
+
+// Định nghĩa interface (đã có sẵn, giữ nguyên)
 export interface Registration {
-  id: string;
-  examDate: string;
-  certificate: string;
-  status: string;
-  createdAt: string;
+  maphieu: string;
+  ngaythi: string;
+  tencc: string;
+  trangthai: string;
+  ngaydangky: string;
 }
 
 export interface Customer {
-  id: string;
-  type: "individual" | "organization";
-  name: string;
-  phone: string;
-  idCard?: string;
+  makh: string;
+  loaikh: 'CaNhan' | 'DonVi';
+  diachi?: string;
+  hoten?: string;
+  cccd?: string;
   email?: string;
-  orgId?: string;
+  sdt?: string;
+  tendv?: string;
+  madv?: string;
   registrations: Registration[];
 }
 
-// Hàm lấy khách hàng cá nhân
-export const fetchIndividualCustomers = async (setCustomers: (customers: Customer[]) => void) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+export interface CustomerFormProps {
+  onSuccess?: () => void;
+  initialData?: {
+    makh: string;
+    loaikh?: 'CaNhan' | 'DonVi';
+    hoten?: string;
+    cccd?: string;
+    email?: string;
+    sdt?: string;
+    diachi?: string;
+    tendv?: string;
+    madv?: string;
+  };
+}
 
-    const { data, error } = await supabase
-      .from("khachhang")
-      .select(`
-        makh,
-        diachi,
-        khachhang_cn (
-          hoten,
-          cccd,
-          email,
-          sdt
-        ),
-        phieudangki (
-          maphieu,
-          ngaydangky,
-          buoithi (
-            thoigian,
-            thongtinchungchi (
-              tencc
-            )
+export async function fetchIndividualCustomers(setCustomers: (customers: Customer[]) => void) {
+  const { data, error } = await supabase
+    .from('khachhang')
+    .select(`
+      makh,
+      loaikh,
+      diachi,
+      khachhang_cn (
+        hoten,
+        cccd,
+        email,
+        sdt
+      ),
+      phieudangki (
+        maphieu,
+        ngaydangky,
+        buoithi (
+          thoigian,
+          thongtinchungchi (
+            tencc
           )
         )
-      `)
-      .eq("loaikh", "CaNhan");
+      )
+    `)
+    .eq('loaikh', 'CaNhan');
 
-    if (error) throw error;
-
-    const customers: Customer[] = data.map((item: any) => ({
-      id: item.makh,
-      type: "individual",
-      name: item.khachhang_cn?.hoten || "",
-      idCard: item.khachhang_cn?.cccd || "",
-      email: item.khachhang_cn?.email || "",
-      phone: item.khachhang_cn?.sdt || "",
-      registrations: item.phieudangki.map((reg: any) => ({
-        id: reg.maphieu,
-        examDate: reg.buoithi?.thoigian ? new Date(reg.buoithi.thoigian).toLocaleDateString("vi-VN") : "Chưa xác định",
-        certificate: reg.buoithi?.thongtinchungchi?.tencc || "Không có",
-        status: reg.ngaydangky ? "Đã duyệt" : "Chờ duyệt",
-        createdAt: reg.ngaydangky ? new Date(reg.ngaydangky).toLocaleDateString("vi-VN") : "Chưa đăng ký",
-      })),
-    }));
-
-    setCustomers(customers);
-  } catch (error: any) {
-    console.error("Error fetching individual customers:", error.message, error);
-    toast.error(`Không thể tải danh sách khách hàng cá nhân: ${error.message}`);
+  if (error) {
+    console.error('Error fetching individual customers:', error.message);
+    throw error;
   }
-};
 
-// Hàm lấy khách hàng đơn vị
-export const fetchOrganizationCustomers = async (setCustomers: (customers: Customer[]) => void) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+  // Loại bỏ trùng lặp dựa trên makh
+  const uniqueData = Array.from(new Map((data as SupabaseCustomer[]).map(item => [item.makh, item])).values());
 
-    const { data, error } = await supabase
-      .from("khachhang")
-      .select(`
-        makh,
-        diachi,
-        khachhang_dv (
-          tendv,
-          madv,
-          sdt,
-          email
-        ),
-        phieudangki (
-          maphieu,
-          ngaydangky,
-          buoithi (
-            thoigian,
-            thongtinchungchi (
-              tencc
-            )
+  const customers: Customer[] = uniqueData.map((item) => ({
+    makh: item.makh,
+    loaikh: item.loaikh,
+    diachi: item.diachi,
+    hoten: item.khachhang_cn?.hoten,
+    cccd: item.khachhang_cn?.cccd,
+    email: item.khachhang_cn?.email,
+    sdt: item.khachhang_cn?.sdt,
+    tendv: undefined, // Không áp dụng cho khách hàng cá nhân
+    madv: undefined, // Không áp dụng cho khách hàng cá nhân
+    registrations: item.phieudangki.map((pdk) => ({
+      maphieu: pdk.maphieu,
+      ngaythi: pdk.buoithi.thoigian,
+      tencc: pdk.buoithi.thongtinchungchi.tencc,
+      trangthai: 'Đã duyệt', // Có thể thêm logic để xác định trạng thái
+      ngaydangky: pdk.ngaydangky,
+    })),
+  }));
+
+  setCustomers(customers);
+}
+
+export async function fetchOrganizationCustomers(setCustomers: (customers: Customer[]) => void) {
+  const { data, error } = await supabase
+    .from('khachhang')
+    .select(`
+      makh,
+      loaikh,
+      diachi,
+      khachhang_dv (
+        tendv,
+        madv,
+        email,
+        sdt
+      ),
+      phieudangki (
+        maphieu,
+        ngaydangky,
+        buoithi (
+          thoigian,
+          thongtinchungchi (
+            tencc
           )
         )
-      `)
-      .eq("loaikh", "DonVi");
+      )
+    `)
+    .eq('loaikh', 'DonVi');
 
-    if (error) throw error;
-
-    const customers: Customer[] = data.map((item: any) => ({
-      id: item.makh,
-      type: "organization",
-      name: item.khachhang_dv?.tendv || "",
-      orgId: item.khachhang_dv?.madv || "",
-      phone: item.khachhang_dv?.sdt || "",
-      email: item.khachhang_dv?.email || "",
-      registrations: item.phieudangki.map((reg: any) => ({
-        id: reg.maphieu,
-        examDate: reg.buoithi?.thoigian ? new Date(reg.buoithi.thoigian).toLocaleDateString("vi-VN") : "Chưa xác định",
-        certificate: reg.buoithi?.thongtinchungchi?.tencc || "Không có",
-        status: reg.ngaydangky ? "Đã duyệt" : "Chờ duyệt",
-        createdAt: reg.ngaydangky ? new Date(reg.ngaydangky).toLocaleDateString("vi-VN") : "Chưa đăng ký",
-      })),
-    }));
-
-    setCustomers(customers);
-  } catch (error: any) {
-    console.error("Error fetching organization customers:", error.message, error);
-    toast.error(`Không thể tải danh sách khách hàng đơn vị: ${error.message}`);
+  if (error) {
+    console.error('Error fetching organization customers:', error.message);
+    throw error;
   }
-};
+
+  // Loại bỏ trùng lặp dựa trên makh
+  const uniqueData = Array.from(new Map((data as SupabaseCustomer[]).map(item => [item.makh, item])).values());
+
+  const customers: Customer[] = uniqueData.map((item) => ({
+    makh: item.makh,
+    loaikh: item.loaikh,
+    diachi: item.diachi,
+    hoten: undefined, // Không áp dụng cho khách hàng đơn vị
+    cccd: undefined, // Không áp dụng cho khách hàng đơn vị
+    email: item.khachhang_dv?.email,
+    sdt: item.khachhang_dv?.sdt,
+    tendv: item.khachhang_dv?.tendv,
+    madv: item.khachhang_dv?.madv,
+    registrations: item.phieudangki.map((pdk) => ({
+      maphieu: pdk.maphieu,
+      ngaythi: pdk.buoithi.thoigian,
+      tencc: pdk.buoithi.thongtinchungchi.tencc,
+      trangthai: 'Đã duyệt',
+      ngaydangky: pdk.ngaydangky,
+    })),
+  }));
+
+  setCustomers(customers);
+}

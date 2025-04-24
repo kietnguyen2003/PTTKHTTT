@@ -1,26 +1,58 @@
+// src/components/confirmation-table.tsx
+import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Customer } from "@/lib/customerService"
+import { supabase } from "@/lib/supabase/supabaseClient"
+import { CertificateDetails, ExamDetails, RegistrationData } from "@/lib/certificateService";
 
-export default function ConfirmationTable() {
-  // Mock data for confirmation
-  const confirmationData = {
-    customer: {
-      type: "Cá nhân",
-      id: "KH001",
-      name: "Nguyễn Văn A",
-      contact: "0912345678",
-    },
-    candidate: {
-      id: "TS001",
-      name: "Nguyễn Văn A",
-      dob: "01/01/1990",
-      gender: "Nam",
-    },
-    exam: {
-      id: "BT001",
-      time: "09:00 - 11:00, 15/05/2025",
-      location: "Phòng 101, Tòa nhà A",
-      certificateType: "Chứng chỉ Tiếng Anh B1",
-    },
+
+
+export default function ConfirmationTable({ 
+  registrationData, 
+  customer 
+}: { 
+  registrationData: RegistrationData | null, 
+  customer: Customer | null 
+}) {
+  const [exam, setExam] = useState<ExamDetails | null>(null);
+  const [certificate, setCertificate] = useState<CertificateDetails | null>(null);
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      if (registrationData) {
+        // Lấy thông tin lịch thi
+        const { data: examData, error: examError } = await supabase
+          .from("buoithi")
+          .select("mabuoithi, thoigian, diadiem")
+          .eq("mabuoithi", registrationData.examId)
+          .single();
+
+        if (examError) {
+          console.error("Error fetching exam details:", examError);
+        } else {
+          setExam(examData);
+        }
+
+        // Lấy thông tin chứng chỉ
+        const { data: certData, error: certError } = await supabase
+          .from("thongtinchungchi")
+          .select("tencc")
+          .eq("macc", registrationData.certificateId)
+          .single();
+
+        if (certError) {
+          console.error("Error fetching certificate details:", certError);
+        } else {
+          setCertificate(certData);
+        }
+      }
+    };
+
+    fetchDetails();
+  }, [registrationData]);
+
+  if (!registrationData || !customer) {
+    return <p className="text-muted-foreground">Vui lòng điền đầy đủ thông tin để xem xác nhận.</p>;
   }
 
   return (
@@ -39,19 +71,19 @@ export default function ConfirmationTable() {
           <TableBody>
             <TableRow>
               <TableCell className="font-medium w-1/3">Loại khách hàng</TableCell>
-              <TableCell>{confirmationData.customer.type}</TableCell>
+              <TableCell>{customer.loaikh === "CaNhan" ? "Cá nhân" : "Đơn vị"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Mã khách hàng</TableCell>
-              <TableCell>{confirmationData.customer.id}</TableCell>
+              <TableCell>{customer.makh}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Tên khách hàng</TableCell>
-              <TableCell>{confirmationData.customer.name}</TableCell>
+              <TableCell>{customer.loaikh === "CaNhan" ? customer.hoten || "N/A" : customer.tendv || "N/A"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Liên hệ</TableCell>
-              <TableCell>{confirmationData.customer.contact}</TableCell>
+              <TableCell>{customer.sdt || "N/A"}</TableCell>
             </TableRow>
           </TableBody>
           <TableHeader>
@@ -64,20 +96,36 @@ export default function ConfirmationTable() {
           <TableBody>
             <TableRow>
               <TableCell className="font-medium">Mã thí sinh</TableCell>
-              <TableCell>{confirmationData.candidate.id}</TableCell>
+              <TableCell>{registrationData.mats}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Họ tên</TableCell>
-              <TableCell>{confirmationData.candidate.name}</TableCell>
+              <TableCell>{registrationData.hoten}</TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Ngày sinh</TableCell>
-              <TableCell>{confirmationData.candidate.dob}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-medium">Giới tính</TableCell>
-              <TableCell>{confirmationData.candidate.gender}</TableCell>
-            </TableRow>
+            {customer.loaikh === "CaNhan" && (
+              <>
+                <TableRow>
+                  <TableCell className="font-medium">Ngày sinh</TableCell>
+                  <TableCell>{registrationData.dob || "N/A"}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Giới tính</TableCell>
+                  <TableCell>{registrationData.gender === "male" ? "Nam" : "Nữ"}</TableCell>
+                </TableRow>
+              </>
+            )}
+            {customer.loaikh === "DonVi" && (
+              <>
+                <TableRow>
+                  <TableCell className="font-medium">Số lượng thí sinh</TableCell>
+                  <TableCell>{registrationData.candidateCount || "N/A"}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Địa điểm tổ chức</TableCell>
+                  <TableCell>{registrationData.venue || "N/A"}</TableCell>
+                </TableRow>
+              </>
+            )}
           </TableBody>
           <TableHeader>
             <TableRow>
@@ -89,19 +137,19 @@ export default function ConfirmationTable() {
           <TableBody>
             <TableRow>
               <TableCell className="font-medium">Mã buổi thi</TableCell>
-              <TableCell>{confirmationData.exam.id}</TableCell>
+              <TableCell>{exam?.mabuoithi || "N/A"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Thời gian</TableCell>
-              <TableCell>{confirmationData.exam.time}</TableCell>
+              <TableCell>{exam?.thoigian || "N/A"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Địa điểm</TableCell>
-              <TableCell>{confirmationData.exam.location}</TableCell>
+              <TableCell>{exam?.diadiem || "N/A"}</TableCell>
             </TableRow>
             <TableRow>
               <TableCell className="font-medium">Loại chứng chỉ</TableCell>
-              <TableCell>{confirmationData.exam.certificateType}</TableCell>
+              <TableCell>{certificate?.tencc || "N/A"}</TableCell>
             </TableRow>
           </TableBody>
         </Table>
