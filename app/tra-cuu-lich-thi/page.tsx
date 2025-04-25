@@ -1,4 +1,3 @@
-// src/app/tra-cuu-lich-thi/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Calendar, Eye, RotateCcw, Clock, Plus } from "lucide-react";
+import { Search, Filter, Calendar, Eye, RotateCcw, Clock, Plus, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/supabaseClient";
@@ -36,6 +35,23 @@ interface SupabaseBuoiThi {
   phongthi: SupabasePhongThi[];
 }
 
+interface SupabaseKhachHang {
+  makh: string;
+  loaikh: string;
+  khachhang_cn?: { hoten: string };
+  khachhang_dv?: { tendv: string };
+}
+
+interface SupabasePhieuDuThi {
+  maphieu: string;
+  sobaodanh: string;
+  makh: string;
+  mabuoithi: string;
+  thoigian: string | null;
+  diadiem: string | null;
+  khachhang: SupabaseKhachHang | null;
+}
+
 interface Exam {
   maBuoiThi: string;
   tenChungChi: string;
@@ -47,6 +63,14 @@ interface Exam {
   ghiChu: string;
 }
 
+interface ExamTicket {
+  maPhieu: string;
+  soBaoDanh: string;
+  tenKhachHang: string;
+  thoiGian: string;
+  diaDiem: string;
+}
+
 interface NewExamData {
   tenChungChi: string;
   ngayThi: string;
@@ -56,8 +80,16 @@ interface NewExamData {
   ghiChu: string;
 }
 
+interface EditExamData {
+  ngayThi: string;
+  gioThi: string;
+  diaDiem: string;
+  trangThai: string;
+}
+
 export default function TraCuuLichThiPage() {
   const [exams, setExams] = useState<Exam[]>([]);
+  const [examTickets, setExamTickets] = useState<ExamTicket[]>([]);
   const [chungChiList, setChungChiList] = useState<SupabaseThongTinChungChi[]>([]);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [newExamData, setNewExamData] = useState<NewExamData>({
@@ -68,6 +100,13 @@ export default function TraCuuLichThiPage() {
     sucChua: "",
     ghiChu: "",
   });
+  const [editExamData, setEditExamData] = useState<EditExamData>({
+    ngayThi: "",
+    gioThi: "",
+    diaDiem: "",
+    trangThai: "",
+  });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filterChungChi, setFilterChungChi] = useState("all");
   const [filterNgayThi, setFilterNgayThi] = useState("");
@@ -154,6 +193,67 @@ export default function TraCuuLichThiPage() {
     }
   };
 
+  // Hàm lấy danh sách phiếu dự thi theo mã buổi thi
+  const fetchExamTickets = async (maBuoiThi: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("phieuduthi")
+        .select(`
+          maphieu,
+          sobaodanh,
+          makh,
+          thoigian,
+          diadiem,
+          khachhang (
+            makh,
+            loaikh,
+            khachhang_cn (hoten),
+            khachhang_dv (tendv)
+          )
+        `)
+        .eq("mabuoithi", maBuoiThi);
+
+      if (error) {
+        console.error("Supabase error fetching exam tickets:", error.message, error.details, error.hint);
+        throw error;
+      }
+
+      const tickets: ExamTicket[] = (data as unknown as SupabasePhieuDuThi[]).map((item) => {
+        const khachHang = item.khachhang;
+        const tenKhachHang = khachHang
+          ? khachHang.loaikh === "CaNhan"
+            ? khachHang.khachhang_cn?.hoten || "N/A"
+            : khachHang.khachhang_dv?.tendv || "N/A"
+          : "N/A";
+
+        return {
+          maPhieu: item.maphieu,
+          soBaoDanh: item.sobaodanh,
+          tenKhachHang,
+          thoiGian: item.thoigian
+            ? new Date(item.thoigian).toLocaleString("vi-VN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Chưa xác định",
+          diaDiem: item.diadiem || "Chưa xác định",
+        };
+      });
+
+      setExamTickets(tickets);
+    } catch (error: any) {
+      console.error("Error fetching exam tickets:", error.message);
+      toast({
+        title: "Lỗi",
+        description: `Không thể tải danh sách phiếu dự thi: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Tải dữ liệu khi component mount
   useEffect(() => {
     const loadData = async () => {
@@ -163,8 +263,85 @@ export default function TraCuuLichThiPage() {
   }, []);
 
   // Hàm xử lý xem chi tiết buổi thi
-  const handleViewExam = (exam: Exam) => {
+  const handleViewExam = async (exam: Exam) => {
     setSelectedExam(exam);
+    await fetchExamTickets(exam.maBuoiThi);
+  };
+
+  // Hàm xử lý mở dialog chỉnh sửa
+  const handleOpenEditDialog = (exam: Exam) => {
+    const thoiGian = new Date(exam.thoiGian.split(", ")[1] + " " + exam.thoiGian.split(", ")[0]);
+    setEditExamData({
+      ngayThi: thoiGian.toISOString().split("T")[0],
+      gioThi: thoiGian.toTimeString().split(" ")[0].substring(0, 5),
+      diaDiem: exam.diaDiem,
+      trangThai: exam.trangThai === "Đã tổ chức" ? "DaToChuc" : "ChuaToChuc",
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Hàm xử lý thay đổi input trong form chỉnh sửa
+  const handleEditInputChange = (field: keyof EditExamData, value: string) => {
+    setEditExamData({
+      ...editExamData,
+      [field]: value,
+    });
+  };
+
+  // Hàm cập nhật buổi thi
+  const handleUpdateExam = async () => {
+    if (!selectedExam) return;
+
+    try {
+      if (!editExamData.ngayThi || !editExamData.gioThi || !editExamData.diaDiem) {
+        throw new Error("Vui lòng nhập đầy đủ ngày thi, giờ thi và địa điểm");
+      }
+
+      // Kết hợp ngày và giờ thi
+      const thoiGianMoi = new Date(`${editExamData.ngayThi}T${editExamData.gioThi}`);
+
+      // Cập nhật thông tin buổi thi trong bảng buoithi
+      const { error: buoiThiError } = await supabase
+        .from("buoithi")
+        .update({
+          thoigian: thoiGianMoi.toISOString(),
+          diadiem: editExamData.diaDiem,
+          trangthai: editExamData.trangThai as "DaToChuc" | "ChuaToChuc",
+        })
+        .eq("mabuoithi", selectedExam.maBuoiThi);
+
+      if (buoiThiError) {
+        throw buoiThiError;
+      }
+
+      // Đồng bộ thời gian và địa điểm với các phiếu dự thi liên quan
+      const { error: phieuDuThiError } = await supabase
+        .from("phieuduthi")
+        .update({
+          thoigian: thoiGianMoi.toISOString(),
+          diadiem: editExamData.diaDiem,
+        })
+        .eq("mabuoithi", selectedExam.maBuoiThi);
+
+      if (phieuDuThiError) {
+        throw phieuDuThiError;
+      }
+
+      toast({ title: "Thành công", description: "Đã cập nhật buổi thi" });
+
+      // Tải lại danh sách lịch thi và phiếu dự thi
+      await Promise.all([fetchExams(), fetchExamTickets(selectedExam.maBuoiThi)]);
+
+      // Đóng dialog chỉnh sửa
+      setEditDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error updating exam:", error.message, error);
+      toast({
+        title: "Lỗi",
+        description: `Không thể cập nhật buổi thi: ${error.message}`,
+        variant: "destructive",
+      });
+    }
   };
 
   // Hàm xử lý thay đổi input trong form thêm lịch thi
@@ -505,47 +682,94 @@ export default function TraCuuLichThiPage() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="sm:max-w-[600px]">
+                          <DialogContent className="sm:max-w-[800px]">
                             <DialogHeader>
                               <DialogTitle>Chi tiết buổi thi</DialogTitle>
                             </DialogHeader>
                             {selectedExam && (
-                              <div className="space-y-4">
-                                <div className="rounded-md border">
-                                  <Table>
-                                    <TableBody>
-                                      <TableRow>
-                                        <TableCell className="font-medium w-1/3">Mã buổi thi</TableCell>
-                                        <TableCell>{selectedExam.maBuoiThi}</TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Loại chứng chỉ</TableCell>
-                                        <TableCell>{selectedExam.tenChungChi}</TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Thời gian</TableCell>
-                                        <TableCell>{selectedExam.thoiGian}</TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Địa điểm</TableCell>
-                                        <TableCell>{selectedExam.diaDiem}</TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Số lượng thí sinh</TableCell>
-                                        <TableCell>
-                                          {selectedExam.soLuongThiSinh}/{selectedExam.sucChua}
-                                        </TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Trạng thái</TableCell>
-                                        <TableCell>{selectedExam.trangThai}</TableCell>
-                                      </TableRow>
-                                      <TableRow>
-                                        <TableCell className="font-medium">Ghi chú</TableCell>
-                                        <TableCell>{selectedExam.ghiChu || "Không có ghi chú"}</TableCell>
-                                      </TableRow>
-                                    </TableBody>
-                                  </Table>
+                              <div className="space-y-6">
+                                {/* Thông tin buổi thi */}
+                                <div>
+                                  <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-lg font-semibold">Thông tin buổi thi</h3>
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={() => handleOpenEditDialog(selectedExam)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                      Chỉnh sửa
+                                    </Button>
+                                  </div>
+                                  <div className="rounded-md border">
+                                    <Table>
+                                      <TableBody>
+                                        <TableRow>
+                                          <TableCell className="font-medium w-1/3">Mã buổi thi</TableCell>
+                                          <TableCell>{selectedExam.maBuoiThi}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Loại chứng chỉ</TableCell>
+                                          <TableCell>{selectedExam.tenChungChi}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Thời gian</TableCell>
+                                          <TableCell>{selectedExam.thoiGian}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Địa điểm</TableCell>
+                                          <TableCell>{selectedExam.diaDiem}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Số lượng thí sinh</TableCell>
+                                          <TableCell>
+                                            {selectedExam.soLuongThiSinh}/{selectedExam.sucChua}
+                                          </TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Trạng thái</TableCell>
+                                          <TableCell>{selectedExam.trangThai}</TableCell>
+                                        </TableRow>
+                                        <TableRow>
+                                          <TableCell className="font-medium">Ghi chú</TableCell>
+                                          <TableCell>{selectedExam.ghiChu || "Không có ghi chú"}</TableCell>
+                                        </TableRow>
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+
+                                {/* Danh sách phiếu dự thi */}
+                                <div>
+                                  <h3 className="text-lg font-semibold mb-2">Danh sách thí sinh</h3>
+                                  {examTickets.length > 0 ? (
+                                    <div className="rounded-md border">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Mã phiếu dự thi</TableHead>
+                                            <TableHead>Số báo danh</TableHead>
+                                            <TableHead>Tên thí sinh</TableHead>
+                                            <TableHead>Thời gian</TableHead>
+                                            <TableHead>Địa điểm</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {examTickets.map((ticket) => (
+                                            <TableRow key={ticket.maPhieu}>
+                                              <TableCell className="font-medium">{ticket.maPhieu}</TableCell>
+                                              <TableCell>{ticket.soBaoDanh}</TableCell>
+                                              <TableCell>{ticket.tenKhachHang}</TableCell>
+                                              <TableCell>{ticket.thoiGian}</TableCell>
+                                              <TableCell>{ticket.diaDiem}</TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  ) : (
+                                    <p>Không có thí sinh nào đăng ký cho buổi thi này.</p>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -560,6 +784,77 @@ export default function TraCuuLichThiPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog chỉnh sửa buổi thi */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa buổi thi</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editNgayThi">Ngày thi</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="editNgayThi"
+                    type="date"
+                    className="pl-8"
+                    value={editExamData.ngayThi}
+                    onChange={(e) => handleEditInputChange("ngayThi", e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editGioThi">Giờ thi</Label>
+                <div className="relative">
+                  <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="editGioThi"
+                    type="time"
+                    className="pl-8"
+                    value={editExamData.gioThi}
+                    onChange={(e) => handleEditInputChange("gioThi", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editDiaDiem">Địa điểm</Label>
+              <Input
+                id="editDiaDiem"
+                placeholder="Nhập địa điểm tổ chức"
+                value={editExamData.diaDiem}
+                onChange={(e) => handleEditInputChange("diaDiem", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="editTrangThai">Trạng thái</Label>
+              <Select
+                value={editExamData.trangThai}
+                onValueChange={(value) => handleEditInputChange("trangThai", value)}
+              >
+                <SelectTrigger id="editTrangThai">
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ChuaToChuc">Chưa tổ chức</SelectItem>
+                  <SelectItem value="DaToChuc">Đã tổ chức</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={handleUpdateExam}>Lưu</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

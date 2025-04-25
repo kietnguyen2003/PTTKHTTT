@@ -375,6 +375,48 @@ const updateExtensionFormStatus = async (id: string, newStatus: string, setExten
       const diaDiemMoi = extensionData.buoithi?.diadiem;
 
       if (maPhieuDuThi && maBuoiThiMoi && thoiGianMoi && diaDiemMoi) {
+        // Cập nhật số lượng thí sinh cho MaBuoiThi cũ (giảm đi 1)
+        const { data: oldBuoiThiData, error: oldBuoiThiError } = await supabase
+          .from('buoithi')
+          .select('soluongthisinh')
+          .eq('mabuoithi', maBuoiThiCu)
+          .single();
+
+        if (oldBuoiThiError || !oldBuoiThiData) {
+          throw new Error('Không tìm thấy buổi thi cũ để cập nhật số lượng thí sinh');
+        }
+
+        const newSoLuongOld = (oldBuoiThiData.soluongthisinh || 0) - 1;
+        const { error: updateOldBuoiThiError } = await supabase
+          .from('buoithi')
+          .update({ soluongthisinh: newSoLuongOld })
+          .eq('mabuoithi', maBuoiThiCu);
+
+        if (updateOldBuoiThiError) {
+          throw new Error('Không thể cập nhật số lượng thí sinh cho buổi thi cũ');
+        }
+
+        // Cập nhật số lượng thí sinh cho MaBuoiThi mới (tăng lên 1)
+        const { data: newBuoiThiData, error: newBuoiThiError } = await supabase
+          .from('buoithi')
+          .select('soluongthisinh')
+          .eq('mabuoithi', maBuoiThiMoi)
+          .single();
+
+        if (newBuoiThiError || !newBuoiThiData) {
+          throw new Error('Không tìm thấy buổi thi mới để cập nhật số lượng thí sinh');
+        }
+
+        const newSoLuongNew = (newBuoiThiData.soluongthisinh || 0) + 1;
+        const { error: updateNewBuoiThiError } = await supabase
+          .from('buoithi')
+          .update({ soluongthisinh: newSoLuongNew })
+          .eq('mabuoithi', maBuoiThiMoi);
+
+        if (updateNewBuoiThiError) {
+          throw new Error('Không thể cập nhật số lượng thí sinh cho buổi thi mới');
+        }
+
         // Cập nhật thời gian thi (thoigian), địa điểm (diadiem), và mabuoithi của phiếu dự thi
         const { error: updateExamTicketError } = await supabase
           .from('phieuduthi')
