@@ -148,6 +148,8 @@ export default function DangKyPage() {
           throw new Error(`Lỗi kiểm tra phiếu dự thi: ${checkExamError.message}`)
         }
 
+        
+
         if (existingExam) {
           toast.error("Bạn đã có phiếu dự thi cho buổi thi này.")
           return
