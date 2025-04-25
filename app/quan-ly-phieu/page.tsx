@@ -33,8 +33,9 @@ import {
 import { Search, Filter, FileText, Eye, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
+import { v4 as uuidv4 } from 'uuid';
 
-// Interface cho phiếu đăng ký
+// interface cho phiếu đăng ký
 interface RegistrationForm {
   id: string;
   customerName: string;
@@ -45,7 +46,7 @@ interface RegistrationForm {
   createdAt: string;
 }
 
-// Interface cho phiếu gia hạn
+// interface cho phiếu gia hạn
 interface ExtensionForm {
   id: string;
   customerName: string;
@@ -57,7 +58,7 @@ interface ExtensionForm {
   createdAt: string;
 }
 
-// Hàm lấy danh sách phiếu đăng ký
+// hàm lấy danh sách phiếu đăng ký
 const fetchRegistrationForms = async (setRegistrationForms: (forms: RegistrationForm[]) => void) => {
   try {
     const { data, error } = await supabase
@@ -127,7 +128,7 @@ const fetchRegistrationForms = async (setRegistrationForms: (forms: Registration
   }
 };
 
-// Hàm lấy danh sách phiếu gia hạn
+// hàm lấy danh sách phiếu gia hạn
 const fetchExtensionForms = async (setExtensionForms: (forms: ExtensionForm[]) => void) => {
   try {
     const { data, error } = await supabase
@@ -136,9 +137,9 @@ const fetchExtensionForms = async (setExtensionForms: (forms: ExtensionForm[]) =
         maphieu,
         makh,
         maphieuduthi,
-        ngaythimoi,
         truonghopdacbiet,
         trangthai,
+        created_at,
         khachhang (
           loaikh,
           khachhang_cn (hoten),
@@ -147,15 +148,26 @@ const fetchExtensionForms = async (setExtensionForms: (forms: ExtensionForm[]) =
         phieuduthi (
           maphieu,
           thoigian
+        ),
+        buoithi (
+          thoigian,
+          diadiem,
+          macc,
+          thongtinchungchi (
+            tencc)
         )
       `);
 
-    if (error) throw error;
+    if (error){
+      console.log("Error: ", error);
+      throw error;
+    }
 
     if (!data || data.length === 0) {
       setExtensionForms([]);
       return;
     }
+    console.log("Data: ", data);
 
     const forms: ExtensionForm[] = data.map((item) => {
       const khachHang = item.khachhang;
@@ -172,13 +184,13 @@ const fetchExtensionForms = async (setExtensionForms: (forms: ExtensionForm[]) =
         oldDate: item.phieuduthi?.thoigian
           ? new Date(item.phieuduthi.thoigian).toLocaleDateString('vi-VN')
           : 'N/A',
-        newDate: item.ngaythimoi
-          ? new Date(item.ngaythimoi).toLocaleDateString('vi-VN')
+        newDate: item.buoithi.thoigian
+          ? new Date(item.buoithi.thoigian).toLocaleDateString('vi-VN')
           : 'N/A',
         reason: item.truonghopdacbiet ? 'Trường hợp đặc biệt' : 'Không có lý do đặc biệt',
         status: item.trangthai || 'Chờ duyệt',
-        createdAt: item.ngaythimoi
-          ? new Date(item.ngaythimoi).toLocaleDateString('vi-VN')
+        createdAt: item.created_at
+          ? new Date(item.created_at).toLocaleDateString('vi-VN')
           : 'N/A',
       };
     });
@@ -194,15 +206,94 @@ const fetchExtensionForms = async (setExtensionForms: (forms: ExtensionForm[]) =
   }
 };
 
-// Hàm cập nhật trạng thái phiếu đăng ký
-const updateRegistrationFormStatus = async (id: string, newStatus: string) => {
+// hàm tạo phiếu dự thi từ phiếu đăng ký
+const createExamTickets = async (registrationId: string) => {
   try {
-    const { error } = await supabase
+    // lấy thông tin phiếu đăng ký
+    const { data: registrationData, error: registrationError } = await supabase
+      .from('phieudangki')
+      .select(`
+        maphieu,
+        makh,
+        mabuoithi,
+        khachhang (
+          loaikh
+        ),
+        buoithi (
+          thoigian,
+          diadiem,
+          macc
+        ),
+        phieudangkichitiet (
+          soluongthisinh
+        )
+      `)
+      .eq('maphieu', registrationId)
+      .single();
+
+    if (registrationError || !registrationData) {
+      throw new Error(registrationError?.message || 'Không tìm thấy phiếu đăng ký');
+    }
+
+    const loaiKh = registrationData.khachhang?.loaikh;
+    const maKh = registrationData.makh;
+    const maBuoiThi = registrationData.mabuoithi;
+    const thoiGian = registrationData.buoithi?.thoigian;
+    const diaDiem = registrationData.buoithi?.diadiem;
+    const maCc = registrationData.buoithi?.macc;
+    const soLuongThiSinh = loaiKh === 'DonVi' ? (registrationData.phieudangkichitiet?.soluongthisinh || 0) : 1;
+
+    // tạo số lượng phiếu dự thi tương ứng
+    const examTickets = [];
+    for (let i = 0; i < soLuongThiSinh; i++) {
+      const ticketId = `PDT${Date.now()}${i}`; // tạo mã phiếu dự thi
+      const candidateNumber = `SBD${Date.now()}${i}`; // tạo số báo danh
+      examTickets.push({
+        maphieu: ticketId,
+        sobaodanh: candidateNumber,
+        makh: maKh,
+        mabuoithi: maBuoiThi,
+        macc: maCc,
+        thoigian: thoiGian,
+        diadiem: diaDiem,
+        diemthi: null,
+      });
+    }
+
+    // chèn các phiếu dự thi vào bảng phieuduthi
+    const { error: insertError } = await supabase
+      .from('phieuduthi')
+      .insert(examTickets);
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    toast.success(`Đã tạo ${soLuongThiSinh} phiếu dự thi cho phiếu đăng ký ${registrationId}`);
+  } catch (error: any) {
+    console.error('Error creating exam tickets:', error);
+    toast.error(`Không thể tạo phiếu dự thi: ${error.message || "Lỗi không xác định"}`);
+  }
+};
+
+// hàm cập nhật trạng thái phiếu đăng ký
+const updateRegistrationFormStatus = async (id: string, newStatus: string, setRegistrationForms: (forms: RegistrationForm[]) => void) => {
+  try {
+    // Cập nhật trạng thái phiếu đăng ký
+    const { error: updateError } = await supabase
       .from('phieudangki')
       .update({ trangthai: newStatus })
       .eq('maphieu', id);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
+
+    // Nếu trạng thái mới là "Đã duyệt", tạo phiếu dự thi
+    if (newStatus === 'Đã duyệt') {
+      await createExamTickets(id);
+    }
+
+    // Tải lại danh sách phiếu đăng ký để đảm bảo dữ liệu mới nhất
+    await fetchRegistrationForms(setRegistrationForms);
 
     toast.success(`Cập nhật trạng thái phiếu đăng ký ${id} thành công!`);
   } catch (error: any) {
@@ -212,14 +303,101 @@ const updateRegistrationFormStatus = async (id: string, newStatus: string) => {
 };
 
 // Hàm cập nhật trạng thái phiếu gia hạn
-const updateExtensionFormStatus = async (id: string, newStatus: string) => {
+const updateExtensionFormStatus = async (id: string, newStatus: string, setExtensionForms: (forms: ExtensionForm[]) => void) => {
   try {
-    const { error } = await supabase
+    // Lấy thông tin phiếu gia hạn để tìm maphieuduthi
+    const { data: extensionData, error: extensionError } = await supabase
+      .from('phieudangkigiahan')
+      .select(`
+        maphieuduthi,
+        buoithimoi,
+        buoithi (
+          thoigian,
+          diadiem
+        )
+      `)
+      .eq('maphieu', id)
+      .single();
+
+    if (extensionError || !extensionData) {
+      throw new Error(extensionError?.message || 'Không tìm thấy phiếu gia hạn');
+    }
+
+    const maPhieuDuThi = extensionData.maphieuduthi;
+
+    // Lấy thông tin phiếu dự thi để tìm makh và mabuoithi
+    const { data: examTicketData, error: examTicketError } = await supabase
+      .from('phieuduthi')
+      .select(`
+        makh,
+        mabuoithi
+      `)
+      .eq('maphieu', maPhieuDuThi)
+      .single();
+
+    if (examTicketError || !examTicketData) {
+      throw new Error(examTicketError?.message || 'Không tìm thấy phiếu dự thi');
+    }
+
+    const maKH = examTicketData.makh;
+    const maBuoiThiCu = examTicketData.mabuoithi;
+
+    // Kiểm tra trạng thái của phiếu đăng ký liên quan
+    const { data: registrationData, error: registrationError } = await supabase
+      .from('phieudangki')
+      .select('trangthai, maphieu')
+      .eq('makh', maKH)
+      .eq('mabuoithi', maBuoiThiCu)
+      .single();
+
+    if (registrationError || !registrationData) {
+      throw new Error(registrationError?.message || 'Không tìm thấy phiếu đăng ký liên quan');
+    }
+
+    // Nếu trạng thái phiếu đăng ký chưa phải là "Đã duyệt", thông báo lỗi và dừng cập nhật
+    if (registrationData.trangthai !== 'Đã duyệt') {
+      toast.error('Cần duyệt phiếu đăng ký');
+      return;
+    }
+
+    // Cập nhật trạng thái phiếu gia hạn
+    const { error: updateError } = await supabase
       .from('phieudangkigiahan')
       .update({ trangthai: newStatus })
       .eq('maphieu', id);
 
-    if (error) throw error;
+    if (updateError) throw updateError;
+
+    // Nếu trạng thái mới là "Đã duyệt", cập nhật ngày thi mới vào phiếu dự thi
+    if (newStatus === 'Đã duyệt') {
+      const maBuoiThiMoi = extensionData.buoithimoi;
+      const thoiGianMoi = extensionData.buoithi?.thoigian;
+      const diaDiemMoi = extensionData.buoithi?.diadiem;
+
+      if (maPhieuDuThi && maBuoiThiMoi && thoiGianMoi && diaDiemMoi) {
+        // Cập nhật thời gian thi (thoigian), địa điểm (diadiem), và mabuoithi của phiếu dự thi
+        const { error: updateExamTicketError } = await supabase
+          .from('phieuduthi')
+          .update({
+            thoigian: thoiGianMoi,
+            diadiem: diaDiemMoi,
+            mabuoithi: maBuoiThiMoi
+          })
+          .eq('maphieu', maPhieuDuThi);
+
+        if (updateExamTicketError) {
+          console.error('Error updating exam ticket time:', updateExamTicketError);
+          throw new Error('Không thể cập nhật thời gian thi của phiếu dự thi');
+        }
+
+        toast.success(`Đã cập nhật thời gian thi cho phiếu dự thi ${maPhieuDuThi} thành ${new Date(thoiGianMoi).toLocaleDateString('vi-VN')}`);
+      } else {
+        throw new Error('Thiếu thông tin để cập nhật: MaPhieuDuThi, MaBuoiThiMoi, ThoiGianMoi hoặc DiaDiemMoi không tồn tại');
+      }
+    }
+
+    // Tải lại danh sách phiếu gia hạn để cập nhật giao diện
+    await fetchExtensionForms(setExtensionForms);
 
     toast.success(`Cập nhật trạng thái phiếu gia hạn ${id} thành công!`);
   } catch (error: any) {
@@ -228,8 +406,8 @@ const updateExtensionFormStatus = async (id: string, newStatus: string) => {
   }
 };
 
-// Hàm xóa phiếu đăng ký
-const deleteRegistrationForm = async (id: string) => {
+// hàm xóa phiếu đăng ký
+const deleteRegistrationForm = async (id: string, setRegistrationForms: (forms: RegistrationForm[]) => void) => {
   try {
     const { error } = await supabase
       .from('phieudangki')
@@ -238,6 +416,9 @@ const deleteRegistrationForm = async (id: string) => {
 
     if (error) throw error;
 
+    // tải lại danh sách phiếu đăng ký
+    await fetchRegistrationForms(setRegistrationForms);
+
     toast.success(`Xóa phiếu đăng ký ${id} thành công!`);
   } catch (error: any) {
     console.error('Error deleting registration form:', error);
@@ -245,8 +426,8 @@ const deleteRegistrationForm = async (id: string) => {
   }
 };
 
-// Hàm xóa phiếu gia hạn
-const deleteExtensionForm = async (id: string) => {
+// hàm xóa phiếu gia hạn
+const deleteExtensionForm = async (id: string, setExtensionForms: (forms: ExtensionForm[]) => void) => {
   try {
     const { error } = await supabase
       .from('phieudangkigiahan')
@@ -254,6 +435,9 @@ const deleteExtensionForm = async (id: string) => {
       .eq('maphieu', id);
 
     if (error) throw error;
+
+    // tải lại danh sách phiếu gia hạn
+    await fetchExtensionForms(setExtensionForms);
 
     toast.success(`Xóa phiếu gia hạn ${id} thành công!`);
   } catch (error: any) {
@@ -269,23 +453,23 @@ export default function QuanLyPhieuPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // State cho dialog xem chi tiết
+  // state cho dialog xem chi tiết
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedRegistrationForm, setSelectedRegistrationForm] = useState<RegistrationForm | null>(null);
   const [selectedExtensionForm, setSelectedExtensionForm] = useState<ExtensionForm | null>(null);
 
-  // State cho dialog chỉnh sửa trạng thái
+  // state cho dialog chỉnh sửa trạng thái
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingFormId, setEditingFormId] = useState<string | null>(null);
   const [editingFormType, setEditingFormType] = useState<'registration' | 'extension' | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
 
-  // State cho dialog xác nhận xóa
+  // state cho dialog xác nhận xóa
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingFormId, setDeletingFormId] = useState<string | null>(null);
   const [deletingFormType, setDeletingFormType] = useState<'registration' | 'extension' | null>(null);
 
-  // Lấy dữ liệu khi component mount
+  // lấy dữ liệu khi component mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -304,26 +488,26 @@ export default function QuanLyPhieuPage() {
     fetchData();
   }, []);
 
-  // Hàm xử lý khi đóng dialog xem chi tiết
+  // hàm xử lý khi đóng dialog xem chi tiết
   const handleCloseViewDialog = () => {
     setViewDialogOpen(false);
     setSelectedRegistrationForm(null);
     setSelectedExtensionForm(null);
   };
 
-  // Hàm xử lý mở dialog xem chi tiết phiếu đăng ký
+  // hàm xử lý mở dialog xem chi tiết phiếu đăng ký
   const handleViewRegistrationForm = (form: RegistrationForm) => {
     setSelectedRegistrationForm(form);
     setViewDialogOpen(true);
   };
 
-  // Hàm xử lý mở dialog xem chi tiết phiếu gia hạn
+  // hàm xử lý mở dialog xem chi tiết phiếu gia hạn
   const handleViewExtensionForm = (form: ExtensionForm) => {
     setSelectedExtensionForm(form);
     setViewDialogOpen(true);
   };
 
-  // Hàm xử lý mở dialog chỉnh sửa trạng thái
+  // hàm xử lý mở dialog chỉnh sửa trạng thái
   const handleOpenEditDialog = (id: string, type: 'registration' | 'extension', currentStatus: string) => {
     setEditingFormId(id);
     setEditingFormType(type);
@@ -331,26 +515,14 @@ export default function QuanLyPhieuPage() {
     setEditDialogOpen(true);
   };
 
-  // Hàm xử lý lưu trạng thái mới
+  // hàm xử lý lưu trạng thái mới
   const handleSaveStatus = async () => {
     if (!editingFormId || !editingFormType) return;
 
     if (editingFormType === 'registration') {
-      await updateRegistrationFormStatus(editingFormId, newStatus);
-      // Cập nhật danh sách phiếu đăng ký
-      setRegistrationForms((prev) =>
-        prev.map((form) =>
-          form.id === editingFormId ? { ...form, status: newStatus } : form
-        )
-      );
+      await updateRegistrationFormStatus(editingFormId, newStatus, setRegistrationForms);
     } else if (editingFormType === 'extension') {
-      await updateExtensionFormStatus(editingFormId, newStatus);
-      // Cập nhật danh sách phiếu gia hạn
-      setExtensionForms((prev) =>
-        prev.map((form) =>
-          form.id === editingFormId ? { ...form, status: newStatus } : form
-        )
-      );
+      await updateExtensionFormStatus(editingFormId, newStatus, setExtensionForms);
     }
 
     setEditDialogOpen(false);
@@ -359,25 +531,21 @@ export default function QuanLyPhieuPage() {
     setNewStatus('');
   };
 
-  // Hàm xử lý mở dialog xác nhận xóa
+  // hàm xử lý mở dialog xác nhận xóa
   const handleOpenDeleteDialog = (id: string, type: 'registration' | 'extension') => {
     setDeletingFormId(id);
     setDeletingFormType(type);
     setDeleteDialogOpen(true);
   };
 
-  // Hàm xử lý xóa phiếu
+  // hàm xử lý xóa phiếu
   const handleDeleteForm = async () => {
     if (!deletingFormId || !deletingFormType) return;
 
     if (deletingFormType === 'registration') {
-      await deleteRegistrationForm(deletingFormId);
-      // Cập nhật danh sách phiếu đăng ký
-      setRegistrationForms((prev) => prev.filter((form) => form.id !== deletingFormId));
+      await deleteRegistrationForm(deletingFormId, setRegistrationForms);
     } else if (deletingFormType === 'extension') {
-      await deleteExtensionForm(deletingFormId);
-      // Cập nhật danh sách phiếu gia hạn
-      setExtensionForms((prev) => prev.filter((form) => form.id !== deletingFormId));
+      await deleteExtensionForm(deletingFormId, setExtensionForms);
     }
 
     setDeleteDialogOpen(false);
@@ -385,7 +553,7 @@ export default function QuanLyPhieuPage() {
     setDeletingFormType(null);
   };
 
-  // Hàm lọc và tìm kiếm
+  // hàm lọc và tìm kiếm
   const filterForms = <T extends RegistrationForm | ExtensionForm>(forms: T[]) => {
     return forms.filter((form) => {
       const matchesSearch =
@@ -656,7 +824,7 @@ export default function QuanLyPhieuPage() {
         </Tabs>
       )}
 
-      {/* Dialog xem chi tiết phiếu */}
+      {/* dialog xem chi tiết phiếu */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -724,7 +892,7 @@ export default function QuanLyPhieuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog chỉnh sửa trạng thái */}
+      {/* dialog chỉnh sửa trạng thái */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -757,7 +925,7 @@ export default function QuanLyPhieuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog xác nhận xóa */}
+      {/* dialog xác nhận xóa */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
