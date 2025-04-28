@@ -259,7 +259,7 @@ export default function QuanLyKhachHangPage() {
           <DialogTrigger asChild>
             <Button className="gap-2">
               <UserPlus className="h-4 w-4" />
-              Đăng ký người dùng
+              Đăng ký khách hàng mới
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
