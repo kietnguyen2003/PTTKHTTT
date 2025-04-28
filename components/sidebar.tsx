@@ -18,6 +18,7 @@ import {
   Receipt,
   CalendarDays,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,6 +39,7 @@ export default function Sidebar({ className }: SidebarProps) {
     ? [
         { href: "/", icon: Home, title: "Trang chủ" },
         { href: "/quan-ly-khach-hang", icon: UserCircle, title: "Quản lý khách hàng" },
+        { href: "/quan-ly-phong-thi", icon: LayoutGrid, title: "Quản lý phòng thi",},
         { href: "/dang-ky", icon: ClipboardList, title: "Đăng ký kiểm tra" },
         { href: "/gia-han", icon: Clock, title: "Gia hạn thời gian thi" },
         { href: "/nhap-ket-qua", icon: PenLine, title: "Nhập kết quả thi" },
