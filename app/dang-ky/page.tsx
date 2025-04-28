@@ -1,3 +1,5 @@
+
+
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -28,15 +30,32 @@ export default function DangKyPage() {
   const [certificateList, setCertificateList] = useState<CertificateList[]>([])
   const [registrationData, setRegistrationData] = useState<RegistrationData | null>(null)
   const [searchPerformed, setSearchPerformed] = useState(false)
+  const [searchResults, setSearchResults] = useState<Customer[]>([])
 
   const handleSearch = () => {
-    const sourceCustomers = customerType === "individual" ? individualCustomers : organizationCustomers
-    const filtered = sourceCustomers.filter((customer) =>
-      customer.makh.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    setSelectedCustomer(filtered[0] || null)
-    setSearchPerformed(true)
-  }
+    const sourceCustomers = customerType === "individual" ? individualCustomers : organizationCustomers;
+    const filtered = sourceCustomers.filter((customer) => {
+      // For individual customers, search by hoten field
+      if (customerType === "individual") {
+        return customer.hoten?.toLowerCase().includes(searchTerm.toLowerCase());
+      } 
+      // For organization customers, search by tendv (organization name) field
+      else {
+        return customer.tendv?.toLowerCase().includes(searchTerm.toLowerCase());
+      }
+    });
+    
+    // Store all filtered results instead of just selecting the first one
+    setSearchResults(filtered);
+    setSelectedCustomer(null); // Clear any previously selected customer
+    setSearchPerformed(true);
+  };
+
+  // New function to handle customer selection from search results
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setSearchResults([]); // Clear search results after selection
+  };
 
   const handleSubmit = async () => {
     // Kiểm tra dữ liệu đầu vào
@@ -147,8 +166,6 @@ export default function DangKyPage() {
         if (checkExamError && checkExamError.code !== "PGRST116") {
           throw new Error(`Lỗi kiểm tra phiếu dự thi: ${checkExamError.message}`)
         }
-
-        
 
         if (existingExam) {
           toast.error("Bạn đã có phiếu dự thi cho buổi thi này.")
@@ -298,82 +315,75 @@ export default function DangKyPage() {
     console.log("Certificate List:", certificateList)
   }, [individualCustomers, organizationCustomers, dateList, certificateList])
 
-  // In page.tsx, update the return section to conditionally render the CandidateForm and ConfirmationTable
-// only when a customer is selected
+  return (
+    <div className="flex-1 space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Lập Phiếu Đăng Ký Kiểm Tra</h1>
+      </div>
 
-return (
-  <div className="flex-1 space-y-6 p-6">
-    <div className="flex items-center justify-between">
-      <h1 className="text-2xl font-bold tracking-tight">Lập Phiếu Đăng Ký Kiểm Tra</h1>
-    </div>
-
-    {loading ? (
-      <p>Đang tải dữ liệu...</p>
-    ) : (
-      <>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Chọn khách hàng</h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="customerType">Loại khách hàng</Label>
-                  <Select value={customerType} onValueChange={setCustomerType}>
-                    <SelectTrigger id="customerType">
-                      <SelectValue placeholder="Chọn loại khách hàng" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Cá nhân</SelectItem>
-                      <SelectItem value="organization">Đơn vị</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customerId">Mã khách hàng</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="customerId"
-                      placeholder="Nhập hoặc tra cứu mã khách hàng"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <Button variant="outline" onClick={handleSearch} size="icon">
-                      <Search className="h-4 w-4" />
-                    </Button>
+      {loading ? (
+        <p>Đang tải dữ liệu...</p>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <h2 className="text-lg font-semibold">Chọn khách hàng</h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="customerType">Loại khách hàng</Label>
+                    <Select value={customerType} onValueChange={setCustomerType}>
+                      <SelectTrigger id="customerType">
+                        <SelectValue placeholder="Chọn loại khách hàng" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Cá nhân</SelectItem>
+                        <SelectItem value="organization">Đơn vị</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-              </div>
-              {selectedCustomer ? (
-                <div className="rounded-md border p-4 bg-muted/50">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Mã khách hàng</p>
-                      <p className="font-medium">{selectedCustomer.makh}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Loại khách hàng</p>
-                      <p className="font-medium">
-                        {selectedCustomer.loaikh === "CaNhan" ? "Cá nhân" : "Đơn vị"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {selectedCustomer.loaikh === "CaNhan" ? "Họ tên" : "Tên đơn vị"}
-                      </p>
-                      <p className="font-medium">
-                        {selectedCustomer.loaikh === "CaNhan"
-                          ? selectedCustomer.hoten || "N/A"
-                          : selectedCustomer.tendv || "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Số điện thoại</p>
-                      <p className="font-medium">{selectedCustomer.sdt || "N/A"}</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerId">Tìm kiếm khách hàng</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="customerId"
+                        placeholder={customerType === "individual" ? "Nhập tên khách hàng" : "Nhập tên đơn vị"}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      <Button variant="outline" onClick={handleSearch} size="icon">
+                        <Search className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
-              ) : (
-                searchPerformed && (
+                
+                {/* Display search results if available */}
+                {searchResults.length > 0 && (
+                  <div className="rounded-md border p-4">
+                    <h3 className="text-sm font-medium mb-2">Kết quả tìm kiếm:</h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {searchResults.map((customer) => (
+                        <div 
+                          key={customer.makh}
+                          className="p-2 rounded hover:bg-accent cursor-pointer flex justify-between items-center"
+                          onClick={() => handleSelectCustomer(customer)}
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {customerType === "individual" ? customer.hoten : customer.tendv}
+                            </p>
+                            <p className="text-sm text-muted-foreground">Mã: {customer.makh}</p>
+                          </div>
+                          <Button variant="ghost" size="sm">Chọn</Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Show "no results" message if search was performed but no results found */}
+                {searchPerformed && searchResults.length === 0 && !selectedCustomer && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Không tìm thấy</AlertTitle>
@@ -381,54 +391,86 @@ return (
                       Không tìm thấy khách hàng với thông tin đã nhập. Vui lòng kiểm tra lại.
                     </AlertDescription>
                   </Alert>
-                )
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+                
+                {/* Display selected customer details if a customer is selected */}
+                {selectedCustomer && (
+                  <div className="rounded-md border p-4 bg-muted/50">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Mã khách hàng</p>
+                        <p className="font-medium">{selectedCustomer.makh}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Loại khách hàng</p>
+                        <p className="font-medium">
+                          {selectedCustomer.loaikh === "CaNhan" ? "Cá nhân" : "Đơn vị"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {selectedCustomer.loaikh === "CaNhan" ? "Họ tên" : "Tên đơn vị"}
+                        </p>
+                        <p className="font-medium">
+                          {selectedCustomer.loaikh === "CaNhan"
+                            ? selectedCustomer.hoten || "N/A"
+                            : selectedCustomer.tendv || "N/A"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Số điện thoại</p>
+                        <p className="font-medium">{selectedCustomer.sdt || "N/A"}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Only show these sections when a customer is selected */}
-        {selectedCustomer && (
-          <>
-            <Card>
-              <CardContent className="pt-6">
-                <CandidateForm
-                  selectedCustomer={selectedCustomer}
-                  dateList={dateList}
-                  certificateList={certificateList}
-                  setRegistrationData={setRegistrationData}
-                />
-              </CardContent>
-            </Card>
+          {/* Only show these sections when a customer is selected */}
+          {selectedCustomer && (
+            <>
+              <Card>
+                <CardContent className="pt-6">
+                  <CandidateForm
+                    selectedCustomer={selectedCustomer}
+                    dateList={dateList}
+                    certificateList={certificateList}
+                    setRegistrationData={setRegistrationData}
+                  />
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardContent className="pt-6">
-                <ConfirmationTable registrationData={registrationData} customer={selectedCustomer} />
-              </CardContent>
-            </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <ConfirmationTable registrationData={registrationData} customer={selectedCustomer} />
+                </CardContent>
+              </Card>
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRegistrationData(null)}>
-                Làm mới
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSelectedCustomer(null);
-                  setRegistrationData(null);
-                  setSearchPerformed(false);
-                }}
-              >
-                Hủy
-              </Button>
-              <Button onClick={handleSubmit} disabled={submitting}>
-                {submitting ? "Đang xử lý..." : "Lập phiếu đăng ký"}
-              </Button>
-            </div>
-          </>
-        )}
-      </>
-    )}
-  </div>
-)
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setRegistrationData(null)}>
+                  Làm mới
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setRegistrationData(null);
+                    setSearchResults([]);
+                    setSearchPerformed(false);
+                  }}
+                >
+                  Hủy
+                </Button>
+                <Button onClick={handleSubmit} disabled={submitting}>
+                  {submitting ? "Đang xử lý..." : "Lập phiếu đăng ký"}
+                </Button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
