@@ -1,71 +1,6 @@
-import { supabase } from "./supabase/supabaseClient";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { Customer, SupabaseCustomer } from "@/types/CustomerTypes";
 
-// Định nghĩa interface cho dữ liệu từ Supabase
-interface SupabaseCustomer {
-  makh: string;
-  loaikh: 'CaNhan' | 'DonVi';
-  diachi?: string;
-  khachhang_cn?: {
-    hoten: string;
-    cccd?: string;
-    email?: string;
-    sdt?: string;
-  };
-  khachhang_dv?: {
-    tendv: string;
-    madv: string;
-    email?: string;
-    sdt?: string;
-  };
-  phieudangki: {
-    maphieu: string;
-    ngaydangky: string;
-    trangthai: string;
-    buoithi: {
-      thoigian: string;
-      thongtinchungchi: {
-        tencc: string;
-      };
-    };
-  }[];
-}
-
-// Định nghĩa interface (đã có sẵn, giữ nguyên)
-export interface Registration {
-  maphieu: string;
-  ngaythi: string;
-  tencc: string;
-  trangthai: string;
-  ngaydangky: string;
-}
-
-export interface Customer {
-  makh: string;
-  loaikh: 'CaNhan' | 'DonVi';
-  diachi?: string;
-  hoten?: string;
-  cccd?: string;
-  email?: string;
-  sdt?: string;
-  tendv?: string;
-  madv?: string;
-  registrations: Registration[];
-}
-
-export interface CustomerFormProps {
-  onSuccess?: () => void;
-  initialData?: {
-    makh: string;
-    loaikh?: 'CaNhan' | 'DonVi';
-    hoten?: string;
-    cccd?: string;
-    email?: string;
-    sdt?: string;
-    diachi?: string;
-    tendv?: string;
-    madv?: string;
-  };
-}
 
 export async function fetchIndividualCustomers(setCustomers: (customers: Customer[]) => void) {
   const { data, error } = await supabase
@@ -102,7 +37,7 @@ export async function fetchIndividualCustomers(setCustomers: (customers: Custome
   console.log("data", data);
 
   // Loại bỏ trùng lặp dựa trên makh
-  const uniqueData = Array.from(new Map((data as SupabaseCustomer[]).map(item => [item.makh, item])).values());
+  const uniqueData = Array.from(new Map((data as unknown as SupabaseCustomer[]).map(item => [item.makh, item])).values());
 
   const customers: Customer[] = uniqueData.map((item) => ({
     makh: item.makh,
@@ -159,7 +94,7 @@ export async function fetchOrganizationCustomers(setCustomers: (customers: Custo
   }
 
   // Loại bỏ trùng lặp dựa trên makh
-  const uniqueData = Array.from(new Map((data as SupabaseCustomer[]).map(item => [item.makh, item])).values());
+  const uniqueData = Array.from(new Map((data as unknown as SupabaseCustomer[]).map(item => [item.makh, item])).values());
 
   const customers: Customer[] = uniqueData.map((item) => ({
     makh: item.makh,

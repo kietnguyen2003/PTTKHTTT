@@ -26,7 +26,8 @@ import {
 import CustomerForm from '@/components/customer-form';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
-import { Customer, fetchIndividualCustomers, fetchOrganizationCustomers } from '@/lib/customerService';
+import { Customer } from '@/types/CustomerTypes';
+import { fetchIndividualCustomers, fetchOrganizationCustomers } from '@/services/khachHangService';
 
 // Hàm xác định trạng thái tổng hợp của khách hàng
 const getCustomerStatus = (registrations: any[]): string => {

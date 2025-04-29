@@ -9,44 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Save, RotateCcw, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabase/supabaseClient";
-
-// Enum for ChungChiStatus
-export enum ChungChiStatus {
-  ChuaNhan = 'ChuaNhan',
-  DaNhan = 'DaNhan',
-}
-
-// Interface for Candidate Info
-export interface CandidateInfo {
-  soBaoDanh: string;
-  maPhieuDuThi: string;
-  hoTen: string;
-  loaiChungChi: string;
-  thoiGianThi: string;
-  diaDiem: string;
-}
-
-// Interface for Result Data
-export interface ResultData {
-  diemThi: string;
-  nguoiCham: string;
-  giamThi: string;
-  trangThai: ChungChiStatus;
-}
-
-// Interface for PhieuDuThi from Supabase
-interface PhieuDuThi {
-  sobaodanh: string;
-  maphieu: string;
-  thoigian: string;
-  diadiem: string;
-  thongtinchungchi: { tencc: string };
-  khachhang: {
-    thongtinthisinh?: { hoten: string };
-    khachhang_cn?: { hoten: string };
-  };
-}
+import { toast } from "react-toastify";
+import { fetchPhieuDuThi } from "@/services/phieuDuThiService";
+import { saveExamResults } from "@/services/ketQuaThiService";
+import { CandidateInfo, ChungChiStatus, PhieuDuThi, ResultData } from "@/types/ExamResultTypes";
+import { updatePhieuDuThiStatus } from "@/services/phieuDangKiService";
 
 export default function NhapKetQuaPage() {
   const [phieuDuThiList, setPhieuDuThiList] = useState<PhieuDuThi[]>([]);
@@ -59,45 +26,27 @@ export default function NhapKetQuaPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
 
-  // Fetch all phieuduthi on component mount
   useEffect(() => {
-    async function fetchPhieuDuThi() {
+    async function loadPhieuDuThi() {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from("phieuduthi")
-          .select(`
-            sobaodanh,
-            maphieu,
-            thoigian,
-            diadiem,
-            thongtinchungchi:macc (tencc),
-            khachhang:makh (
-              thongtinthisinh (hoten),
-              khachhang_cn (hoten)
-            )
-          `);
-
-        if (error) throw error;
-
-        setPhieuDuThiList(data || []);
+        await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
       } catch (error: any) {
-        setError("Lỗi khi tải danh sách phiếu dự thi: " + error.message);
-        console.error("Error fetching phieuduthi:", error.message);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
     }
-    fetchPhieuDuThi();
+    loadPhieuDuThi();
   }, []);
 
-  // Handle selecting a candidate from the table
   const handleSelectCandidate = (phieu: PhieuDuThi) => {
     setSelectedCandidate({
       soBaoDanh: phieu.sobaodanh,
       maPhieuDuThi: phieu.maphieu,
-      hoTen: phieu.khachhang.thongtinthisinh?.hoten || phieu.khachhang.khachhang_cn?.hoten || "Không có tên",
+      hoTen: phieu.khachhang?.thongtinthsinh?.hoten || phieu.khachhang?.khachhang_cn?.hoten || "Không có tên",
       loaiChungChi: phieu.thongtinchungchi.tencc,
       thoiGianThi: new Date(phieu.thoigian).toLocaleString("vi-VN"),
       diaDiem: phieu.diadiem,
@@ -111,7 +60,6 @@ export default function NhapKetQuaPage() {
     setError(null);
   };
 
-  // Handle resetting the form
   const handleReset = () => {
     setSelectedCandidate(null);
     setResultData({
@@ -123,67 +71,41 @@ export default function NhapKetQuaPage() {
     setError(null);
   };
 
-  // Handle saving results
   const handleSaveResults = async () => {
     setError(null);
+    setSaving(true);
 
     const score = Number.parseFloat(resultData.diemThi);
     if (isNaN(score) || score < 0 || score > 100) {
       setError("Điểm thi phải là số từ 0 đến 100");
+      setSaving(false);
       return;
     }
 
     try {
-      // Check for duplicate result
-      const { data: existing } = await supabase
-        .from("ketquathi")
-        .select("mabaithi")
-        .eq("sobaodanh", selectedCandidate!.soBaoDanh)
-        .single();
-      if (existing) {
-        setError("Kết quả thi cho số báo danh này đã tồn tại.");
-        return;
-      }
+      // Cập nhật status của phiếu dự thi thành đã thi
+      await updatePhieuDuThiStatus(selectedCandidate!.maPhieuDuThi, "da_thi");
 
-      // Insert ketquathi
-      const { error: ketQuaError } = await supabase.from("ketquathi").insert([
-        {
-          mabaithi: `KQT${Date.now()}`,
-          sobaodanh: selectedCandidate!.soBaoDanh,
-          diemthi: score,
-          nguoicham: resultData.nguoiCham,
-          giamthi: resultData.giamThi,
-        },
-      ]);
+      // Lưu kết quả thi
+      await saveExamResults(
+        selectedCandidate!.soBaoDanh,
+        score,
+        resultData.nguoiCham,
+        resultData.giamThi,
+        resultData.trangThai
+      );
 
-      if (ketQuaError) throw ketQuaError;
+      // Tải lại danh sách phiếu dự thi
+      await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
 
-      // Get macc for bangtinh
-      const { data: phieuDuThi } = await supabase
-        .from("phieuduthi")
-        .select("macc")
-        .eq("sobaodanh", selectedCandidate!.soBaoDanh)
-        .single();
-
-      // Insert bangtinh
-      const { error: bangTinhError } = await supabase.from("bangtinh").insert([
-        {
-          sobaodanh: selectedCandidate!.soBaoDanh,
-          diemthi: score,
-          macc: phieuDuThi.macc,
-          ngaycap: new Date().toISOString(),
-          nguoinhap: "NV001",
-          trangthai: resultData.trangThai,
-        },
-      ]);
-
-      if (bangTinhError) throw bangTinhError;
-
-      alert("Đã lưu kết quả thi thành công!");
+      // Hiển thị thông báo thành công
+      toast.success("Đã lưu kết quả thi thành công!");
       handleReset();
     } catch (error: any) {
-      setError("Lỗi khi lưu kết quả thi: " + error.message);
-      console.error("Error saving results:", error);
+      setError(error.message);
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -240,8 +162,8 @@ export default function NhapKetQuaPage() {
                         <TableCell>{phieu.sobaodanh}</TableCell>
                         <TableCell>{phieu.maphieu}</TableCell>
                         <TableCell>
-                          {phieu.khachhang.thongtinthisinh?.hoten ||
-                            phieu.khachhang.khachhang_cn?.hoten ||
+                          {phieu.khachhang?.thongtinthsinh?.hoten ||
+                            phieu.khachhang?.khachhang_cn?.hoten ||
                             "Không có tên"}
                         </TableCell>
                         <TableCell>{phieu.thongtinchungchi.tencc}</TableCell>
@@ -252,6 +174,7 @@ export default function NhapKetQuaPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSelectCandidate(phieu)}
+                            disabled={saving}
                           >
                             Chọn
                           </Button>
@@ -311,6 +234,7 @@ export default function NhapKetQuaPage() {
                     value={resultData.diemThi}
                     onChange={(e) => setResultData({ ...resultData, diemThi: e.target.value })}
                     className={resultData.diemThi && !isScoreValid() ? "border-red-500 focus-visible:ring-red-500" : ""}
+                    disabled={saving}
                   />
                   {resultData.diemThi && !isScoreValid() && (
                     <p className="text-xs text-red-500">Điểm thi phải là số từ 0 đến 100</p>
@@ -321,6 +245,7 @@ export default function NhapKetQuaPage() {
                   <Select
                     value={resultData.trangThai}
                     onValueChange={(value: ChungChiStatus) => setResultData({ ...resultData, trangThai: value })}
+                    disabled={saving}
                   >
                     <SelectTrigger id="trangThai">
                       <SelectValue placeholder="Chọn trạng thái" />
@@ -338,6 +263,7 @@ export default function NhapKetQuaPage() {
                     placeholder="Nhập tên người chấm thi"
                     value={resultData.nguoiCham}
                     onChange={(e) => setResultData({ ...resultData, nguoiCham: e.target.value })}
+                    disabled={saving}
                   />
                 </div>
                 <div className="space-y-2">
@@ -347,18 +273,19 @@ export default function NhapKetQuaPage() {
                     placeholder="Nhập tên giám thị"
                     value={resultData.giamThi}
                     onChange={(e) => setResultData({ ...resultData, giamThi: e.target.value })}
+                    disabled={saving}
                   />
                 </div>
               </div>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={handleReset} className="gap-2">
+                <Button variant="outline" onClick={handleReset} className="gap-2" disabled={saving}>
                   <RotateCcw className="h-4 w-4" />
                   Hủy
                 </Button>
-                <Button onClick={handleSaveResults} disabled={!isFormValid()} className="gap-2">
+                <Button onClick={handleSaveResults} disabled={!isFormValid() || saving} className="gap-2">
                   <Save className="h-4 w-4" />
-                  Lưu kết quả
+                  {saving ? "Đang lưu..." : "Lưu kết quả"}
                 </Button>
               </div>
             </div>

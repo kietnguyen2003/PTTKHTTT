@@ -31,12 +31,12 @@ export function AuthProvider({
     // Chỉ kiểm tra session nếu không có initialSession
     const checkSession = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
-          console.error('Error fetching user:', error.message);
+          console.error('Error fetching session:', error.message);
           setUser(null);
         } else {
-          setUser(user);
+          setUser(session?.user ?? null);
         }
       } catch (err) {
         console.error('Unexpected error:', err);

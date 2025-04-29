@@ -1,35 +1,8 @@
-// lib/certificateService.ts
-import { supabase } from "./supabase/supabaseClient";
+
+// services/thongTinChungChiService.ts
+import { CertificateList } from "@/types/CertificateTypes";
+import { supabase } from "../lib/supabase/supabaseClient";
 import { toast } from "sonner";
-
-
-export interface ExamDetails {
-  mabuoithi: string;
-  thoigian: string;
-  diadiem: string;
-}
-
-export interface CertificateDetails {
-  tencc: string;
-}
-export interface CertificateList {
-  macc: string;
-  tencc: string;
-  thoigianthi: number;
-  giatien: number;
-}
-
-export interface RegistrationData {
-  mats: string;
-  hoten: string;
-  dob: string;
-  gender: string;
-  candidateCount: number | null;
-  venue: string | null;
-  certificateId: string;
-  examId: string;
-}
-
 
 export async function fetchCertificateList(setCertificateList: (certificates: CertificateList[]) => void) {
   try {
@@ -58,7 +31,7 @@ export async function fetchCertificateList(setCertificateList: (certificates: Ce
       giatien: item.giatien,
     }));
 
-    console.log("Fetched certificate list:", certificates); // Sửa cách log để hiển thị dữ liệu rõ ràng
+    console.log("Fetched certificate list:", certificates);
     setCertificateList(certificates);
   } catch (error: any) {
     console.error("Error fetching certificate list:", error.message || error);

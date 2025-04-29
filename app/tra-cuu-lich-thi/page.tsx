@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, Calendar, Eye, RotateCcw, Clock, Plus, Pencil } from "lucide-react";
+import { Search, Filter, Calendar, Eye, RotateCcw, Clock, Plus, Pencil, Award } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase/supabaseClient";
@@ -87,6 +87,12 @@ interface EditExamData {
   trangThai: string;
 }
 
+interface NewChungChiData {
+  tencc: string;
+  thoigianthi: number;
+  giatien: number;
+}
+
 export default function TraCuuLichThiPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [examTickets, setExamTickets] = useState<ExamTicket[]>([]);
@@ -106,6 +112,12 @@ export default function TraCuuLichThiPage() {
     diaDiem: "",
     trangThai: "",
   });
+  const [newChungChiData, setNewChungChiData] = useState<NewChungChiData>({
+    tencc: "",
+    thoigianthi: 0,
+    giatien: 0,
+  });
+  const [createChungChiDialogOpen, setCreateChungChiDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filterChungChi, setFilterChungChi] = useState("all");
@@ -252,6 +264,51 @@ export default function TraCuuLichThiPage() {
         variant: "destructive",
       });
     }
+  };
+
+  // Hàm thêm chứng chỉ mới
+  const handleAddChungChi = async () => {
+    try {
+      if (!newChungChiData.tencc.trim()) {
+        throw new Error("Vui lòng nhập tên chứng chỉ");
+      }
+
+      // Tạo mã chứng chỉ mới
+      const newMaChungChi = `CC${Date.now()}`;
+
+      // Lưu chứng chỉ mới vào Supabase
+      const { error } = await supabase.from("thongtinchungchi").insert({
+        macc: newMaChungChi,
+        tencc: newChungChiData.tencc,
+        thoigianthi: newChungChiData.thoigianthi,
+        giatien: newChungChiData.giatien,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({ title: "Thành công", description: "Đã tạo chứng chỉ mới" });
+
+      // Cập nhật danh sách chứng chỉ
+      await fetchChungChi();
+
+      // Reset form và đóng dialog
+      setNewChungChiData({ tencc: "", thoigianthi: 0, giatien: 0 });
+      setCreateChungChiDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error adding chung chi:", error.message);
+      toast({
+        title: "Lỗi",
+        description: `Không thể tạo chứng chỉ: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Hàm xử lý thay đổi input trong form tạo chứng chỉ
+  const handleChungChiInputChange = (value: string, field: 'tencc' | 'thoigianthi' | 'giatien') => {
+    setNewChungChiData({ ...newChungChiData, [field]: value });
   };
 
   // Tải dữ liệu khi component mount
@@ -445,110 +502,162 @@ export default function TraCuuLichThiPage() {
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Tra Cứu Lịch Thi</h1>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Thêm lịch thi
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Thêm lịch thi mới</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="tenChungChi">Loại chứng chỉ</Label>
-                <Select
-                  value={newExamData.tenChungChi}
-                  onValueChange={(value) => handleInputChange("tenChungChi", value)}
-                >
-                  <SelectTrigger id="tenChungChi">
-                    <SelectValue placeholder="Chọn loại chứng chỉ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {chungChiList.length > 0 ? (
-                      chungChiList.map((chungChi) => (
-                        <SelectItem key={chungChi.macc} value={chungChi.tencc || ""}>
-                          {chungChi.tencc || "Không xác định"}
+        <div className="flex gap-2">
+          <Dialog open={createChungChiDialogOpen} onOpenChange={setCreateChungChiDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Award className="h-4 w-4" />
+                Tạo chứng chỉ
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Tạo chứng chỉ mới</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tencc">Tên chứng chỉ</Label>
+                  <Input
+                    id="tencc"
+                    placeholder="Nhập tên chứng chỉ (VD: Tiếng Anh B1)"
+                    value={newChungChiData.tencc}
+                    onChange={(e) => handleChungChiInputChange(e.target.value, 'tencc')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="thoigianthi">Thời gian thi</Label>
+                  <Input
+                    id="thoigianthi"
+                    type="number"
+                    placeholder="Nhập thời gian thi (VD: 120 phút)"
+                    value={newChungChiData.thoigianthi}
+                    onChange={(e) => handleChungChiInputChange(e.target.value, 'thoigianthi')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="giatien">Giá tiền</Label>
+                  <Input
+                    id="giatien"
+                    type="number"
+                    placeholder="Nhập giá tiền (VD: 1000000)"
+                    value={newChungChiData.giatien}
+                    onChange={(e) => handleChungChiInputChange(e.target.value, 'giatien')}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateChungChiDialogOpen(false)}>
+                  Hủy
+                </Button>
+                <Button onClick={handleAddChungChi}>Tạo chứng chỉ</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Thêm lịch thi
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Thêm lịch thi mới</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tenChungChi">Loại chứng chỉ</Label>
+                  <Select
+                    value={newExamData.tenChungChi}
+                    onValueChange={(value) => handleInputChange("tenChungChi", value)}
+                  >
+                    <SelectTrigger id="tenChungChi">
+                      <SelectValue placeholder="Chọn loại chứng chỉ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {chungChiList.length > 0 ? (
+                        chungChiList.map((chungChi) => (
+                          <SelectItem key={chungChi.macc} value={chungChi.tencc || ""}>
+                            {chungChi.tencc || "Không xác định"}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Không có chứng chỉ nào
                         </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>
-                        Không có chứng chỉ nào
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ngayThi">Ngày thi</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="ngayThi"
-                      type="date"
-                      className="pl-8"
-                      value={newExamData.ngayThi}
-                      onChange={(e) => handleInputChange("ngayThi", e.target.value)}
-                    />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ngayThi">Ngày thi</Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="ngayThi"
+                        type="date"
+                        className="pl-8"
+                        value={newExamData.ngayThi}
+                        onChange={(e) => handleInputChange("ngayThi", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gioThi">Giờ thi</Label>
+                    <div className="relative">
+                      <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="gioThi"
+                        type="time"
+                        className="pl-8"
+                        value={newExamData.gioThi}
+                        onChange={(e) => handleInputChange("gioThi", e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="gioThi">Giờ thi</Label>
-                  <div className="relative">
-                    <Clock className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="gioThi"
-                      type="time"
-                      className="pl-8"
-                      value={newExamData.gioThi}
-                      onChange={(e) => handleInputChange("gioThi", e.target.value)}
-                    />
-                  </div>
+                  <Label htmlFor="diaDiem">Địa điểm</Label>
+                  <Input
+                    id="diaDiem"
+                    placeholder="Nhập địa điểm tổ chức"
+                    value={newExamData.diaDiem}
+                    onChange={(e) => handleInputChange("diaDiem", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="sucChua">Sức chứa</Label>
+                  <Input
+                    id="sucChua"
+                    type="number"
+                    placeholder="Nhập sức chứa phòng thi"
+                    value={newExamData.sucChua}
+                    onChange={(e) => handleInputChange("sucChua", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ghiChu">Ghi chú</Label>
+                  <Textarea
+                    id="ghiChu"
+                    placeholder="Nhập ghi chú (nếu có)"
+                    value={newExamData.ghiChu}
+                    onChange={(e) => handleInputChange("ghiChu", e.target.value)}
+                    rows={3}
+                  />
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="diaDiem">Địa điểm</Label>
-                <Input
-                  id="diaDiem"
-                  placeholder="Nhập địa điểm tổ chức"
-                  value={newExamData.diaDiem}
-                  onChange={(e) => handleInputChange("diaDiem", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sucChua">Sức chứa</Label>
-                <Input
-                  id="sucChua"
-                  type="number"
-                  placeholder="Nhập sức chứa phòng thi"
-                  value={newExamData.sucChua}
-                  onChange={(e) => handleInputChange("sucChua", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ghiChu">Ghi chú</Label>
-                <Textarea
-                  id="ghiChu"
-                  placeholder="Nhập ghi chú (nếu có)"
-                  value={newExamData.ghiChu}
-                  onChange={(e) => handleInputChange("ghiChu", e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline">Hủy</Button>
-              <Button onClick={handleAddExam}>Thêm lịch thi</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline">Hủy</Button>
+                <Button onClick={handleAddExam}>Thêm lịch thi</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card>

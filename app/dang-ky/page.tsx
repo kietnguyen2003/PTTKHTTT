@@ -1,5 +1,3 @@
-
-
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -12,11 +10,16 @@ import { AlertCircle, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Customer, fetchIndividualCustomers, fetchOrganizationCustomers } from "@/lib/customerService"
-import { DateList, fetchDateList } from "@/lib/dateService"
-import { CertificateList, fetchCertificateList, RegistrationData } from "@/lib/certificateService"
+
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Customer } from "@/types/CustomerTypes"
+import { RegistrationData } from "@/types/RegistrationTypes"
+import { DateList } from "@/types/DateTypes"
+import { CertificateList } from "@/types/CertificateTypes"
+import { fetchIndividualCustomers, fetchOrganizationCustomers } from "@/services/khachHangService"
+import { fetchDateList } from "@/services/buoiThiService"
+import { fetchCertificateList } from "@/services/thongTinChungChiService"
 
 export default function DangKyPage() {
   const [individualCustomers, setIndividualCustomers] = useState<Customer[]>([])
@@ -35,285 +38,302 @@ export default function DangKyPage() {
   const handleSearch = () => {
     const sourceCustomers = customerType === "individual" ? individualCustomers : organizationCustomers;
     const filtered = sourceCustomers.filter((customer) => {
-      // For individual customers, search by hoten field
       if (customerType === "individual") {
         return customer.hoten?.toLowerCase().includes(searchTerm.toLowerCase());
-      } 
-      // For organization customers, search by tendv (organization name) field
-      else {
+      } else {
         return customer.tendv?.toLowerCase().includes(searchTerm.toLowerCase());
       }
     });
-    
-    // Store all filtered results instead of just selecting the first one
+
     setSearchResults(filtered);
-    setSelectedCustomer(null); // Clear any previously selected customer
+    setSelectedCustomer(null);
     setSearchPerformed(true);
   };
 
-  // New function to handle customer selection from search results
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
-    setSearchResults([]); // Clear search results after selection
+    setSearchResults([]);
   };
 
   const handleSubmit = async () => {
-    // Kiểm tra dữ liệu đầu vào
     if (!selectedCustomer) {
-      toast.error("Vui lòng chọn khách hàng trước khi đăng ký.")
-      return
+      console.log("Error: Vui lòng chọn khách hàng trước khi đăng ký.");
+      return;
     }
-
+  
     if (!registrationData) {
-      toast.error("Vui lòng điền đầy đủ thông tin đăng ký.")
-      return
+      console.log("Error: Vui lòng điền đầy đủ thông tin đăng ký.");
+      return;
     }
-
+  
     if (!registrationData.examId) {
-      toast.error("Vui lòng chọn buổi thi.")
-      return
+      console.log("Error: Vui lòng chọn buổi thi.");
+      return;
     }
-
+  
     if (!registrationData.certificateId) {
-      toast.error("Vui lòng chọn loại chứng chỉ.")
-      return
+      console.log("Error: Vui lòng chọn loại chứng chỉ.");
+      return;
     }
-
+  
+    // Kiểm tra và sử dụng examId (MaBuoiThi là VARCHAR trong schema)
+    const maBuoiThi = registrationData.examId;
+    if (!maBuoiThi || typeof maBuoiThi !== "string") {
+      console.log("Error: Buổi thi không hợp lệ. Vui lòng chọn lại buổi thi.");
+      return;
+    }
+  
+    // Kiểm tra và sử dụng certificateId (MaCC là VARCHAR trong schema)
+    const maCC = registrationData.certificateId;
+    if (!maCC || typeof maCC !== "string") {
+      console.log("Error: Loại chứng chỉ không hợp lệ. Vui lòng chọn lại loại chứng chỉ.");
+      return;
+    }
+  
     if (customerType === "individual") {
       if (!registrationData.hoten || !registrationData.dob || !registrationData.gender) {
-        toast.error("Vui lòng điền đầy đủ thông tin thí sinh (họ tên, ngày sinh, giới tính).")
-        return
+        console.log("Error: Vui lòng điền đầy đủ thông tin thí sinh (họ tên, ngày sinh, giới tính).");
+        return;
       }
     } else {
       if (!registrationData.candidateCount || registrationData.candidateCount <= 0) {
-        toast.error("Vui lòng nhập số lượng thí sinh hợp lệ.")
-        return
+        console.log("Error: Vui lòng nhập số lượng thí sinh hợp lệ.");
+        return;
       }
       if (!registrationData.venue) {
-        toast.error("Vui lòng nhập địa điểm tổ chức.")
-        return
+        console.log("Error: Vui lòng nhập địa điểm tổ chức.");
+        return;
       }
-
+  
       // Kiểm tra số lượng thí sinh còn lại
       const { data: examData, error: examError } = await supabase
         .from("buoithi")
         .select("soluongthisinh")
-        .eq("mabuoithi", registrationData.examId)
-        .single()
-
+        .eq("mabuoithi", maBuoiThi)
+        .single();
+  
       if (examError) {
-        toast.error("Lỗi kiểm tra sức chứa buổi thi.")
-        return
+        console.log("Error: Lỗi kiểm tra sức chứa buổi thi.", examError);
+        return;
       }
-
+  
+      // Kiểm tra số lượng thí sinh đã đăng ký từ PhieuDuThi
       const { data: registeredData, error: regError } = await supabase
-        .from("phieudangkichitiet")
-        .select("soluongthisinh")
-        .in(
-          "maphieu",
-          (await supabase
-            .from("phieudangki")
-            .select("maphieu")
-            .eq("mabuoithi", registrationData.examId)
-          ).data?.map(p => p.maphieu) || []
-        )
-
+        .from("phieuduthi")
+        .select("maphieu")
+        .eq("mabuoithi", maBuoiThi);
+  
       if (regError) {
-        toast.error("Lỗi kiểm tra số lượng thí sinh đã đăng ký.")
-        return
+        console.log("Error: Lỗi kiểm tra số lượng thí sinh đã đăng ký.", regError);
+        return;
       }
-
-      const totalRegistered = registeredData.reduce(
-        (sum, item) => sum + (item.soluongthisinh || 0),
-        0
-      )
-      const remaining = examData.soluongthisinh - totalRegistered
+  
+      const totalRegistered = registeredData.length;
+      const remaining = examData.soluongthisinh - totalRegistered;
       if (registrationData.candidateCount > remaining) {
-        toast.error(`Số lượng thí sinh vượt quá số chỗ còn lại (${remaining}).`)
-        return
+        console.log(`Error: Số lượng thí sinh vượt quá số chỗ còn lại (${remaining}).`);
+        return;
       }
     }
-
-    setSubmitting(true)
-
+  
+    setSubmitting(true);
+  
     try {
-      // Kiểm tra xem thí sinh đã đăng ký thi chưa
+      // Kiểm tra xem khách hàng đã đăng ký thi chưa
       const { data: existingRegistration, error: checkRegistrationError } = await supabase
         .from("phieudangki")
-        .select(`
-          maphieu,
-          mabuoithi,
-          phieudangkichitiet (
-            mats
-          )
-        `)
+        .select("maphieu")
         .eq("makh", selectedCustomer.makh)
-        .eq("mabuoithi", registrationData.examId)
-        .single()
-
+        .eq("mabuoithi", maBuoiThi)
+        .single();
+  
       if (checkRegistrationError && checkRegistrationError.code !== "PGRST116") {
-        throw new Error(`Lỗi kiểm tra đăng ký: ${checkRegistrationError.message}`)
+        throw new Error(`Lỗi kiểm tra đăng ký: ${checkRegistrationError.message}`);
       }
-
+  
       if (existingRegistration) {
         const { data: existingExam, error: checkExamError } = await supabase
           .from("phieuduthi")
           .select("maphieu")
           .eq("makh", selectedCustomer.makh)
-          .eq("mabuoithi", registrationData.examId)
-          .single()
-
+          .eq("mabuoithi", maBuoiThi);
+  
         if (checkExamError && checkExamError.code !== "PGRST116") {
-          throw new Error(`Lỗi kiểm tra phiếu dự thi: ${checkExamError.message}`)
+          throw new Error(`Lỗi kiểm tra phiếu dự thi: ${checkExamError.message}`);
         }
-
-        if (existingExam) {
-          toast.error("Bạn đã có phiếu dự thi cho buổi thi này.")
-          return
+  
+        if (existingExam && existingExam.length > 0) {
+          console.log("Error: Bạn đã có phiếu dự thi cho buổi thi này.");
+          return;
         } else {
-          toast.error("Bạn đã đăng ký thi cho buổi thi này rồi.")
-          return
+          console.log("Error: Bạn đã đăng ký thi cho buổi thi này rồi.");
+          return;
         }
       }
-
-      // Sinh maphieu
-      const maphieu = crypto.randomUUID()
-      let mats: string
-
+  
+      // Sinh MaPhieu dạng chuỗi UUID
+      const maPhieu = "PDK" + crypto.randomUUID();
+  
+      let maTS: string;
+      let candidates: { mats: string; makh: string; hoten: string }[] = []; // Khai báo candidates ở phạm vi ngoài
+  
       if (customerType === "individual") {
         const { data: existingTS, error: checkTSError } = await supabase
           .from("thongtinthisinh")
           .select("mats")
           .eq("makh", selectedCustomer.makh)
-          .single()
-
+          .single();
+  
         if (checkTSError && checkTSError.code !== "PGRST116") {
-          throw new Error(`Lỗi kiểm tra thông tin thí sinh: ${checkTSError.message}`)
+          throw new Error(`Lỗi kiểm tra thông tin thí sinh: ${checkTSError.message}`);
         }
-
+  
         if (existingTS) {
-          mats = existingTS.mats
+          maTS = existingTS.mats;
         } else {
           const { data: tsData, error: tsError } = await supabase
             .rpc("generate_mats")
-            .single()
-
-          if (tsError) throw new Error(`Lỗi sinh mã thí sinh: ${tsError.message}`)
-          mats = tsData as string
-
+            .single();
+  
+          if (tsError) throw new Error(`Lỗi sinh mã thí sinh: ${tsError.message}`);
+          maTS = tsData as string;
+  
           const { error: insertTsError } = await supabase
             .from("thongtinthisinh")
             .insert({
-              mats: mats,
+              mats: maTS,
               makh: selectedCustomer.makh,
               hoten: registrationData.hoten,
               ngaysinh: registrationData.dob,
               gioitinh: registrationData.gender === "male" ? "Nam" : "Nữ",
-            })
-
-          if (insertTsError) throw new Error(`Lỗi thêm thông tin thí sinh: ${insertTsError.message}`)
+            });
+  
+          if (insertTsError) throw new Error(`Lỗi thêm thông tin thí sinh: ${insertTsError.message}`);
         }
       } else {
-        const { data: tsData, error: tsError } = await supabase
-          .rpc("generate_mats")
-          .single()
-
-        if (tsError) throw new Error(`Lỗi sinh mã thí sinh: ${tsError.message}`)
-        mats = tsData as string
-
+        const candidateCount = registrationData.candidateCount || 0;
+        candidates = []; // Gán lại giá trị để TypeScript biết candidates được khởi tạo
+  
+        for (let i = 0; i < candidateCount; i++) {
+          const { data: tsData, error: tsError } = await supabase
+            .rpc("generate_mats")
+            .single();
+  
+          if (tsError) throw new Error(`Lỗi sinh mã thí sinh: ${tsError.message}`);
+          const newMaTS = tsData as string;
+  
+          candidates.push({
+            mats: newMaTS,
+            makh: selectedCustomer.makh,
+            hoten: `Thí sinh ${i + 1} - Tổ chức: ${selectedCustomer.tendv}`,
+          });
+        }
+  
         const { error: insertTsError } = await supabase
           .from("thongtinthisinh")
-          .insert({
-            mats: mats,
-            makh: selectedCustomer.makh,
-            hoten: `Tổ chức: ${selectedCustomer.tendv}`,
-          })
-
-        if (insertTsError) throw new Error(`Lỗi thêm thông tin thí sinh: ${insertTsError.message}`)
+          .insert(candidates);
+  
+        if (insertTsError) throw new Error(`Lỗi thêm thông tin thí sinh: ${insertTsError.message}`);
+  
+        maTS = candidates[0].mats; // Lưu MaTS đầu tiên để sử dụng nếu cần
       }
-
+  
+      // Thêm phiếu đăng ký
       const { error: phieuError } = await supabase
         .from("phieudangki")
         .insert({
-          maphieu: maphieu,
+          maphieu: maPhieu,
           makh: selectedCustomer.makh,
-          mabuoithi: registrationData.examId,
+          mabuoithi: maBuoiThi,
           ngaydangky: new Date().toISOString(),
-        })
-
-      if (phieuError) throw new Error(`Lỗi thêm phiếu đăng ký: ${phieuError.message}`)
-
-      const { error: chiTietError } = await supabase
-        .from("phieudangkichitiet")
-        .insert({
-          maphieu: maphieu,
-          mats: mats,
-          soluongthisinh: customerType === "organization" ? registrationData.candidateCount : null,
-          diadiemtochuc: customerType === "organization" ? registrationData.venue : null,
-        })
-
-      if (chiTietError) throw new Error(`Lỗi thêm chi tiết phiếu đăng ký: ${chiTietError.message}`)
-
-      // Cập nhật soluongthisinh trong buoithi (chỉ cho DonVi)
-      if (customerType === "organization" && registrationData.candidateCount) {
-        const { data: examData, error: examError } = await supabase
-          .from("buoithi")
-          .select("soluongthisinh")
-          .eq("mabuoithi", registrationData.examId)
-          .single()
-
-        if (examError) throw new Error(`Lỗi lấy thông tin buổi thi: ${examError.message}`)
-
-        const newSoluong = examData.soluongthisinh - registrationData.candidateCount
-        if (newSoluong < 0) {
-          throw new Error("Số lượng thí sinh còn lại không đủ.")
+        });
+  
+      if (phieuError) throw new Error(`Lỗi thêm phiếu đăng ký: ${phieuError.message}`);
+  
+      // Tạo phiếu dự thi (PhieuDuThi) cho từng thí sinh
+      if (customerType === "individual") {
+        const maPhieuDuThi = crypto.randomUUID();
+        const soBaoDanh = `SBD-${crypto.randomUUID().split("-")[0]}`; // Sinh SoBaoDanh dạng chuỗi
+  
+        const { error: insertPhieuDuThiError } = await supabase
+          .from("phieuduthi")
+          .insert({
+            maphieu: maPhieuDuThi,
+            sobaodanh: soBaoDanh,
+            makh: selectedCustomer.makh,
+            mats: maTS,
+            maphieudangki: maPhieu,
+            mabuoithi: maBuoiThi,
+            macc: maCC, // Sử dụng trực tiếp chuỗi maCC
+            maphong: null,
+            status: "chua_thi",
+          });
+  
+        if (insertPhieuDuThiError) throw new Error(`Lỗi thêm phiếu dự thi: ${insertPhieuDuThiError.message}`);
+      } else {
+        const candidateCount = registrationData.candidateCount || 0;
+        const phieuDuThiList = [];
+  
+        for (let i = 0; i < candidateCount; i++) {
+          const maPhieuDuThi = crypto.randomUUID();
+          const soBaoDanh = `SBD-${crypto.randomUUID().split("-")[0]}`; // Sinh SoBaoDanh dạng chuỗi
+  
+          phieuDuThiList.push({
+            maphieu: maPhieuDuThi,
+            sobaodanh: soBaoDanh,
+            makh: selectedCustomer.makh,
+            mats: candidates[i].mats, // candidates giờ đã được khai báo đúng phạm vi
+            maphieudangki: maPhieu,
+            mabuoithi: maBuoiThi,
+            macc: maCC, // Sử dụng trực tiếp chuỗi maCC
+            maphong: null,
+          });
         }
-
-        const { error: updateError } = await supabase
-          .from("buoithi")
-          .update({ soluongthisinh: newSoluong })
-          .eq("mabuoithi", registrationData.examId)
-
-        if (updateError) throw new Error(`Lỗi cập nhật số lượng thí sinh: ${updateError.message}`)
+  
+        const { error: insertPhieuDuThiError } = await supabase
+          .from("phieuduthi")
+          .insert(phieuDuThiList);
+  
+        if (insertPhieuDuThiError) throw new Error(`Lỗi thêm phiếu dự thi: ${insertPhieuDuThiError.message}`);
       }
-
-      toast.success("Lập phiếu đăng ký thành công!", {
-        description: `Phiếu đăng ký đã được tạo với mã: ${maphieu}`,
-      })
+  
+      console.log("Success: Lập phiếu đăng ký thành công!", {
+        description: `Phiếu đăng ký đã được tạo với mã: ${maPhieu}`,
+      });
     } catch (error: any) {
-      console.error("Error submitting registration:", error)
-      toast.error(`Lập phiếu đăng ký thất bại: ${error.message || "Vui lòng thử lại"}`)
+      console.error("Error submitting registration:", error);
+      console.error(`Lập phiếu đăng ký thất bại: ${error.message || "Vui lòng thử lại"}`);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
         await Promise.all([
           fetchIndividualCustomers(setIndividualCustomers),
           fetchOrganizationCustomers(setOrganizationCustomers),
           fetchDateList(setDateList),
           fetchCertificateList(setCertificateList),
-        ])
+        ]);
       } catch (error: any) {
-        console.error("Error fetching data:", error)
-        toast.error(`Không thể tải dữ liệu: ${error.message || "Lỗi không xác định"}`)
+        console.error("Error fetching data:", error);
+        toast.error(`Không thể tải dữ liệu: ${error.message || "Lỗi không xác định"}`);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchData()
-  }, [])
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
-    console.log("Individual Customers:", individualCustomers)
-    console.log("Organization Customers:", organizationCustomers)
-    console.log("Date List:", dateList)
-    console.log("Certificate List:", certificateList)
-  }, [individualCustomers, organizationCustomers, dateList, certificateList])
+    console.log("Individual Customers:", individualCustomers);
+    console.log("Organization Customers:", organizationCustomers);
+    console.log("Date List:", dateList);
+    console.log("Certificate List:", certificateList);
+  }, [individualCustomers, organizationCustomers, dateList, certificateList]);
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -357,14 +377,13 @@ export default function DangKyPage() {
                     </div>
                   </div>
                 </div>
-                
-                {/* Display search results if available */}
+
                 {searchResults.length > 0 && (
                   <div className="rounded-md border p-4">
                     <h3 className="text-sm font-medium mb-2">Kết quả tìm kiếm:</h3>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {searchResults.map((customer) => (
-                        <div 
+                        <div
                           key={customer.makh}
                           className="p-2 rounded hover:bg-accent cursor-pointer flex justify-between items-center"
                           onClick={() => handleSelectCustomer(customer)}
@@ -381,8 +400,7 @@ export default function DangKyPage() {
                     </div>
                   </div>
                 )}
-                
-                {/* Show "no results" message if search was performed but no results found */}
+
                 {searchPerformed && searchResults.length === 0 && !selectedCustomer && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -392,8 +410,7 @@ export default function DangKyPage() {
                     </AlertDescription>
                   </Alert>
                 )}
-                
-                {/* Display selected customer details if a customer is selected */}
+
                 {selectedCustomer && (
                   <div className="rounded-md border p-4 bg-muted/50">
                     <div className="grid grid-cols-2 gap-4">
@@ -428,7 +445,6 @@ export default function DangKyPage() {
             </CardContent>
           </Card>
 
-          {/* Only show these sections when a customer is selected */}
           {selectedCustomer && (
             <>
               <Card>
@@ -452,8 +468,8 @@ export default function DangKyPage() {
                 <Button variant="outline" onClick={() => setRegistrationData(null)}>
                   Làm mới
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setSelectedCustomer(null);
                     setRegistrationData(null);
@@ -472,5 +488,5 @@ export default function DangKyPage() {
         </>
       )}
     </div>
-  )
+  );
 }

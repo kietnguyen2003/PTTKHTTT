@@ -1,15 +1,10 @@
 // lib/dateService.ts
-import { supabase } from "./supabase/supabaseClient";
+import { DateList } from "@/types/DateTypes";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
+import { ExamSchedule } from "@/types/ExamDetails";
 
-export interface DateList {
-  mabuoithi: string;
-  thoigian: string;
-  diadiem: string;
-  soluongthisinh: number;
-  trangthai: string;
-}
-
+// lấy danh sách buổi thi
 export async function fetchDateList(setDateList: (dates: DateList[]) => void) {
   try {
     const { data, error } = await supabase
@@ -52,3 +47,31 @@ export async function fetchDateList(setDateList: (dates: DateList[]) => void) {
     toast.error(`Không thể tải danh sách lịch thi: ${error.message || "Lỗi không xác định"}`);
   }
 }
+
+// lấy danh sách buổi thi
+export async function fetchExamSchedules(): Promise<ExamSchedule[]> {
+  const { data, error } = await supabase
+    .from('buoithi')
+    .select(`
+      mabuoithi,
+      thoigian,
+      diadiem,
+      thongtinchungchi (
+        tencc
+      )
+    `)
+    .eq('trangthai', 'ChuaToChuc');
+
+  if (error) {
+    console.error('error fetching exam schedules:', error.message);
+    return [];
+  }
+
+  return data.map((item) => ({
+    id: item.mabuoithi,
+    time: new Date(item.thoigian).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }),
+    location: item.diadiem || 'N/A',
+  }));
+}
+
+

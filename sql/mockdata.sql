@@ -1,74 +1,111 @@
--- Insert sample data for KhachHang (2 customers: 1 CaNhan, 1 DonVi)
-INSERT INTO KhachHang (MaKH, LoaiKH, DiaChi) VALUES
+-- Bước 1: Tạo khách hàng và lưu vào bảng khachhang
+INSERT INTO khachhang (makh, loaikh, diachi) VALUES
 ('KH001', 'CaNhan', '123 Đường Láng, Hà Nội'),
-('KH002', 'DonVi', '456 Nguyễn Trãi, TP.HCM');
+('KH002', 'DonVi', '456 Nguyễn Trãi, TP.HCM'),
+('KH003', 'CaNhan', '789 Lê Lợi, Đà Nẵng');
 
--- Insert sample data for KhachHang_CN (Individual customer details)
-INSERT INTO KhachHang_CN (MaKH, HoTen, CCCD, Email, SDT) VALUES
-('KH001', 'Nguyễn Văn An', '123456789012', 'an.nguyen@email.com', '0912345678');
+-- Bước 2: Phân loại khách hàng và lưu vào khachhang_cn hoặc khachhang_dv
+-- Khách hàng cá nhân (CaNhan)
+INSERT INTO khachhang_cn (makh, hoten, cccd, email, sdt) VALUES
+('KH001', 'Nguyễn Văn An', '123456789012', 'an.nguyen@email.com', '0912345678'),
+('KH003', 'Trần Thị Hương', '987654321098', 'huong.tran@email.com', '0935678901');
 
--- Insert sample data for KhachHang_DV (Organization customer details, linked to DonVi)
-INSERT INTO KhachHang_DV (MaKH, TenDV, MaDV, SDT, email) VALUES
+-- Khách hàng đơn vị (DonVi)
+INSERT INTO khachhang_dv (makh, tendv, madv, sdt, email) VALUES
 ('KH002', 'Công ty TNHH ABC', 'DV001', '0987654321', 'tnhhabc@gmail.com');
 
--- Insert sample data for ThongTinThiSinh (Candidates)
-INSERT INTO ThongTinThiSinh (MaTS, MaKH, HoTen, NgaySinh, GioiTinh) VALUES
-('TS001', 'KH001', 'Nguyễn Văn An', '1995-05-15', 'Nam'),
-('TS002', 'KH002', 'Trần Thị Bình', '1998-08-20', 'Nu'),
-('TS003', 'KH002', 'Lê Văn Cường', '1997-03-10', 'Nam');
-
--- Insert sample data for ThongTinChungChi (Certificates)
-INSERT INTO ThongTinChungChi (MaCC, TenCC, ThoiGianThi, GiaTien) VALUES
-('CC001', 'Chứng chỉ ACCI Cấp 1', 120, 1500000),
-('CC002', 'Chứng chỉ ACCI Cấp 2', 180, 2500000);
-
--- Insert sample data for BuoiThi (Exam sessions)
-INSERT INTO BuoiThi (MaBuoiThi, MaCC, SoLuongThiSinh, DiaDiem, ThoiGian, TrangThai) VALUES
-('BT001', 'CC001', 50, 'Trung tâm Hội nghị ABC, Hà Nội', '2025-06-01 08:00:00', 'ChuaToChuc'),
-('BT002', 'CC002', 30, 'Trường ĐH XYZ, TP.HCM', '2025-06-15 09:00:00', 'ChuaToChuc');
-
--- Insert sample data for PhongThi (Exam rooms)
-INSERT INTO PhongThi (MaPhong, MaBuoiThi, SucChua) VALUES
-('PT001', 'BT001', 25),
-('PT002', 'BT001', 25),
-('PT003', 'BT002', 30);
-
--- Insert sample data for NhanVien (Staff members)
-INSERT INTO NhanVien (MaNV, TenNV, CongViec, SDT) VALUES
+-- Bước 3: Tạo dữ liệu hỗ trợ khác trước khi lập phiếu đăng ký
+-- Thêm nhân viên (nhanvien)
+INSERT INTO nhanvien (manv, tennv, congviec, sdt) VALUES
 ('NV001', 'Phạm Thị Dung', 'Quản lý thi', '0901234567'),
 ('NV002', 'Hoàng Văn Em', 'Kế toán', '0919876543');
 
--- Insert sample data for PhieuDangKi (Registrations)
-INSERT INTO PhieuDangKi (MaPhieu, MaKH, MaBuoiThi, NgayDangKy) VALUES
-('PDK001', 'KH001', 'BT001', '2025-05-01 10:00:00'),
-('PDK002', 'KH002', 'BT002', '2025-05-02 14:00:00');
+-- Thêm chứng chỉ (thongtinchungchi)
+INSERT INTO thongtinchungchi (macc, tencc, thoigianthi, giatien) VALUES
+('CC001', 'Tiếng Anh B1', 120, 1500000),
+('CC002', 'Tin học cơ bản', 90, 1000000);
 
--- Insert sample data for PhieuDangKiChiTiet (Registration details)
-INSERT INTO PhieuDangKiChiTiet (MaPhieu, MaTS, SoLuongThiSinh, DiaDiemToChuc) VALUES
-('PDK001', 'TS001', NULL, NULL), -- CaNhan: no SoLuongThiSinh or DiaDiemToChuc
-('PDK002', 'TS002', 2, 'Trường ĐH XYZ, TP.HCM'); -- DonVi: 2 candidates
+-- Thêm buổi thi (buoithi)
+INSERT INTO buoithi (mabuoithi, macc, soluongthisinh, diadiem, thoigian, trangthai) VALUES
+('BT001', 'CC001', 0, 'Trung tâm Hội nghị ABC, Hà Nội', '2025-06-01 08:00:00', 'chuatochuc'),
+('BT002', 'CC002', 0, 'Trường ĐH XYZ, TP.HCM', '2025-06-15 09:00:00', 'chuatochuc');
 
--- Insert sample data for PhieuDuThi (Exam tickets)
-INSERT INTO PhieuDuThi (MaPhieu, SoBaoDanh, MaKH, MaBuoiThi, MaCC, MaPhong, ThoiGian, DiaDiem, DiemThi) VALUES
-('PDT001', 'SBD001', 'KH001', 'BT001', 'CC001', 'PT001', '2025-06-01 08:00:00', 'Trung tâm Hội nghị ABC, Hà Nội', NULL),
-('PDT002', 'SBD002', 'KH002', 'BT002', 'CC002', 'PT003', '2025-06-15 09:00:00', 'Trường ĐH XYZ, TP.HCM', NULL),
-('PDT003', 'SBD003', 'KH002', 'BT002', 'CC002', 'PT003', '2025-06-15 09:00:00', 'Trường ĐH XYZ, TP.HCM', NULL);
+-- Thêm phòng thi (phongthi)
+INSERT INTO phongthi (maphong, mabuoithi, tenphong, toanha, succhua, trangthai, ghichu) VALUES
+('P101', 'BT001', 'Phòng 101', 'Tòa nhà A', 30, 'available', 'Phòng máy tính, có máy chiếu'),
+('P102', 'BT002', 'Phòng 102', 'Tòa nhà A', 25, 'available', 'Phòng máy tính, có máy chiếu');
 
--- Insert sample data for PhieuDangKiGiaHan (Extension requests)
-INSERT INTO PhieuDangKiGiaHan (MaPhieu, MaKH, MaPhieuDuThi, LanGiaHan, NguoiLapPhieu, NgayThiMoi, TruongHopDacBiet) VALUES
-('PGH001', 'KH001', 'PDT001', 1, 'NV001', '2025-07-01 08:00:00', TRUE); -- Special case: illness
+-- Bước 4: Lập phiếu đăng ký (phieudangki) và thêm thông tin thí sinh (thongtinthsinh)
+-- Khách hàng KH001 (CaNhan) lập phiếu đăng ký
+INSERT INTO phieudangki (maphieu, makh, mabuoithi, ngaydangky, trangthai) VALUES
+('PDK001', 'KH001', 'BT001', '2025-05-01 10:00:00', 'cho_duyet');
 
--- Insert sample data for HoaDon (Invoices)
-INSERT INTO HoaDon (MaHoaDon, MaKH, NgayLapHoaDon, NguoiLapHoaDon, GiamGia, TongTien, TinhTrang) VALUES
-('HD001', 'KH001', '2025-05-01 11:00:00', 'NV002', 0, 1500000, 'ChuaThanhToan'),
-('HD002', 'KH002', '2025-05-02 15:00:00', 'NV002', 500000, 4500000, 'DaThanhToan'); -- 2 candidates x 2500000 - 500000 discount
+-- Thêm thông tin thí sinh cho KH001
+INSERT INTO thongtinthsinh (mats, makh, hoten, ngaysinh, gioitinh) VALUES
+('TS001', 'KH001', 'Nguyễn Văn An', '1995-05-15', 'Nam');
 
--- Insert sample data for KetQuaThi (Exam results, assuming exams are graded later)
-INSERT INTO KetQuaThi (MaBaiThi, SoBaoDanh, DiemThi, NguoiCham, GiamThi) VALUES
+-- Khách hàng KH002 (DonVi) lập phiếu đăng ký
+INSERT INTO phieudangki (maphieu, makh, mabuoithi, ngaydangky, trangthai) VALUES
+('PDK002', 'KH002', 'BT002', '2025-05-02 14:00:00', 'cho_duyet');
+
+-- Thêm thông tin thí sinh cho KH002 (2 thí sinh)
+INSERT INTO thongtinthsinh (mats, makh, hoten, ngaysinh, gioitinh) VALUES
+('TS002', 'KH002', 'Trần Thị Bình', '1998-08-20', 'Nu'),
+('TS003', 'KH002', 'Lê Văn Cường', '1997-03-10', 'Nam');
+
+-- Khách hàng KH003 (CaNhan) lập phiếu đăng ký
+INSERT INTO phieudangki (maphieu, makh, mabuoithi, ngaydangky, trangthai) VALUES
+('PDK003', 'KH003', 'BT001', '2025-05-03 09:00:00', 'cho_duyet');
+
+-- Thêm thông tin thí sinh cho KH003
+INSERT INTO thongtinthsinh (mats, makh, hoten, ngaysinh, gioitinh) VALUES
+('TS004', 'KH003', 'Trần Thị Hương', '1996-07-25', 'Nu');
+
+-- Bước 5: Duyệt phiếu đăng ký và thêm vào phieuduthi
+-- Duyệt phiếu đăng ký PDK001 (KH001)
+UPDATE phieudangki 
+SET trangthai = 'da_duyet'
+WHERE maphieu = 'PDK001';
+
+-- Thêm phiếu dự thi cho thí sinh TS001 (KH001)
+INSERT INTO phieuduthi (maphieu, sobaodanh, makh, mats, maphieudangki, mabuoithi, macc, maphong, status) VALUES
+('PDT001', 'SBD001', 'KH001', 'TS001', 'PDK001', 'BT001', 'CC001', 'P101', 'da_thi');
+
+-- Duyệt phiếu đăng ký PDK002 (KH002)
+UPDATE phieudangki 
+SET trangthai = 'da_duyet'
+WHERE maphieu = 'PDK002';
+
+-- Thêm phiếu dự thi cho thí sinh TS002 và TS003 (KH002)
+INSERT INTO phieuduthi (maphieu, sobaodanh, makh, mats, maphieudangki, mabuoithi, macc, maphong, status) VALUES
+('PDT002', 'SBD002', 'KH002', 'TS002', 'PDK002', 'BT002', 'CC002', 'P102', 'da_thi'),
+('PDT003', 'SBD003', 'KH002', 'TS003', 'PDK002', 'BT002', 'CC002', 'P102', 'da_thi');
+
+-- Duyệt phiếu đăng ký PDK003 (KH003)
+UPDATE phieudangki 
+SET trangthai = 'da_duyet'
+WHERE maphieu = 'PDK003';
+
+-- Thêm phiếu dự thi cho thí sinh TS004 (KH003)
+INSERT INTO phieuduthi (maphieu, sobaodanh, makh, mats, maphieudangki, mabuoithi, macc, maphong, status) VALUES
+('PDT004', 'SBD004', 'KH003', 'TS004', 'PDK003', 'BT001', 'CC001', 'P101', 'da_thi');
+
+-- Bước 6: Nhập điểm vào ketquathi
+INSERT INTO ketquathi (mabaithi, sobaodanh, diemthi, nguoicham, giamthi) VALUES
 ('KQT001', 'SBD001', 85.5, 'Nguyễn Thị Hoa', 'Trần Văn Nam'),
-('KQT002', 'SBD002', 90.0, 'Nguyễn Thị Hoa', 'Trần Văn Nam');
+('KQT002', 'SBD002', 80.0, 'Nguyễn Thị Hoa', 'Trần Văn Nam'),
+('KQT003', 'SBD003', 90.0, 'Nguyễn Thị Hoa', 'Trần Văn Nam'),
+('KQT004', 'SBD004', 88.5, 'Nguyễn Thị Hoa', 'Trần Văn Nam');
 
--- Insert sample data for BangTinh (Certificates issued)
-INSERT INTO BangTinh (SoBaoDanh, DiemThi, MaCC, NgayCap, NguoiNhap, TrangThai) VALUES
-('SBD001', 85.5, 'CC001', '2025-06-10 10:00:00', 'NV001', 'DaNhan'),
-('SBD002', 90.0, 'CC002', '2025-06-20 10:00:00', 'NV001', 'ChuaNhan');
+-- Bước 7: Tạo hóa đơn (hoadon)
+INSERT INTO hoadon (mahoadon, makh, ngaylaphoadon, nguoilaphoadon, giamgia, tongtien, tinhtrang) VALUES
+('HD001', 'KH001', '2025-05-01 12:00:00', 'NV002', 0, 1500000, 'ChuaThanhToan'),
+('HD002', 'KH002', '2025-05-02 15:00:00', 'NV002', 0, 2000000, 'ChuaThanhToan'),
+('HD003', 'KH003', '2025-05-03 10:00:00', 'NV002', 0, 1500000, 'ChuaThanhToan');
+
+-- Bước 8: Cập nhật bảng tính (bangtinh)
+INSERT INTO bangtinh (sobaodanh, diemthi, macc, ngaycap, nguoinhap, trangthai) VALUES
+('SBD001', 85.5, 'CC001', '2025-06-10 09:00:00', 'NV001', 'DaNhan'),
+('SBD002', 80.0, 'CC002', '2025-06-20 09:00:00', 'NV001', 'DaNhan'),
+('SBD003', 90.0, 'CC002', '2025-06-20 09:00:00', 'NV001', 'DaNhan'),
+('SBD004', 88.5, 'CC001', '2025-06-10 09:00:00', 'NV001', 'DaNhan');

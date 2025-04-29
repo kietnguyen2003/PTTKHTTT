@@ -5,7 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchExamSchedules, fetchStaffMembers, ExamSchedule, StaffMember } from "@/lib/extensionService";
+import { ExamSchedule } from "@/types/ExamTypes";
+import { StaffMember } from "@/types/MemberTypes";
+import { fetchExamSchedules } from "@/services/buoiThiService";
+import { fetchStaffMembers } from "@/services/nhanVienService";
 
 export default function ExtensionForm({
   onFormChange,

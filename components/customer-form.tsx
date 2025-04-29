@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { toast } from '@/components/ui/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { CustomerFormProps } from '@/lib/customerService';
+import { CustomerFormProps } from '@/types/CustomerTypes';
 
 export default function CustomerForm({ onSuccess, initialData }: CustomerFormProps) {
   const [formData, setFormData] = useState({

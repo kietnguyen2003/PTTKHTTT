@@ -1,3 +1,4 @@
+// pages/QuanLyPhongThiPage.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -20,40 +21,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase/supabaseClient";
-
-// Types
-interface Candidate {
-  soBaoDanh: string;
-  hoTen: string;
-  loaiChungChi: string;
-}
-
-interface ExamRoom {
-  maphong: string;
-  tenphong: string;
-  toanha: string;
-  succhua: number;
-  soThiSinhHienTai: number;
-  trangthai: string;
-  ghichu: string;
-  thiSinh: Candidate[];
-}
-
-interface RoomFormData {
-  maphong: string;
-  tenphong: string;
-  toanha: string;
-  succhua: string;
-  trangthai: string;
-  ghichu: string;
-}
-
-interface UnassignedCandidate {
-  sobaodanh: string;
-  hoten: string;
-  tencc: string;
-}
+import { toast } from "sonner";
+import {
+  fetchExamRooms,
+  fetchUnassignedCandidates,
+  saveExamRoom,
+  deleteExamRoom,
+  assignCandidateToRoom,
+  removeCandidateFromRoom,
+  updateRoomStatus,
+} from "@/services/phongThiService";
+import { ExamRoom, RoomFormData, UnassignedCandidate } from "@/types/ExamRoomTypes";
 
 export default function QuanLyPhongThiPage() {
   const [examRooms, setExamRooms] = useState<ExamRoom[]>([]);
@@ -72,75 +50,18 @@ export default function QuanLyPhongThiPage() {
   const [filterToaNha, setFilterToaNha] = useState("all");
   const [filterTrangThai, setFilterTrangThai] = useState("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Fetch exam rooms and unassigned candidates
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        // Fetch exam rooms
-        const { data: roomsData, error: roomsError } = await supabase
-          .from("phongthi")
-          .select(`
-            maphong,
-            tenphong,
-            toanha,
-            succhua,
-            trangthai,
-            ghichu,
-            phieuduthi (
-              sobaodanh,
-              khachhang:makh (
-                thongtinthisinh (hoten),
-                khachhang_cn (hoten)
-              ),
-              thongtinchungchi:macc (tencc)
-            )
-          `);
-
-        if (roomsError) throw roomsError;
-
-        const formattedRooms: ExamRoom[] = roomsData.map((room) => ({
-          maphong: room.maphong,
-          tenphong: room.tenphong,
-          toanha: room.toanha,
-          succhua: room.succhua,
-          trangthai: room.trangthai,
-          ghichu: room.ghichu || "",
-          soThiSinhHienTai: room.phieuduthi.length,
-          thiSinh: room.phieuduthi.map((pdt) => ({
-            soBaoDanh: pdt.sobaodanh,
-            hoTen: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-            loaiChungChi: pdt.thongtinchungchi.tencc,
-          })),
-        }));
-        setExamRooms(formattedRooms);
-
-        // Fetch unassigned candidates
-        const { data: unassignedData, error: unassignedError } = await supabase
-          .from("phieuduthi")
-          .select(`
-            sobaodanh,
-            khachhang:makh (
-              thongtinthisinh (hoten),
-              khachhang_cn (hoten)
-            ),
-            thongtinchungchi:macc (tencc)
-          `)
-          .is("maphong", null);
-
-        if (unassignedError) throw unassignedError;
-
-        const formattedUnassigned: UnassignedCandidate[] = unassignedData.map((pdt) => ({
-          sobaodanh: pdt.sobaodanh,
-          hoten: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-          tencc: pdt.thongtinchungchi.tencc,
-        }));
-        setUnassignedCandidates(formattedUnassigned);
-      } catch (err: any) {
-        setError("Lỗi khi tải dữ liệu: " + err.message);
-        console.error("Error fetching data:", err);
+        await Promise.all([
+          fetchExamRooms(setExamRooms),
+          fetchUnassignedCandidates(setUnassignedCandidates),
+        ]);
+      } catch (error: any) {
+        toast.error(error.message);
       } finally {
         setLoading(false);
       }
@@ -189,259 +110,27 @@ export default function QuanLyPhongThiPage() {
   const handleSaveRoom = async () => {
     // Validate form
     if (!newRoomData.maphong || !newRoomData.tenphong || !newRoomData.toanha || !newRoomData.succhua) {
-      alert("Vui lòng điền đầy đủ thông tin bắt buộc");
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
 
-    const capacity = Number.parseInt(newRoomData.succhua);
-    if (isNaN(capacity) || capacity <= 0) {
-      alert("Sức chứa phải là số dương");
-      return;
-    }
-
-    try {
-      if (selectedRoom) {
-        // Update existing room
-        const { error } = await supabase
-          .from("phongthi")
-          .update({
-            tenphong: newRoomData.tenphong,
-            toanha: newRoomData.toanha,
-            succhua: capacity,
-            trangthai: newRoomData.trangthai,
-            ghichu: newRoomData.ghichu,
-          })
-          .eq("maphong", newRoomData.maphong);
-
-        if (error) throw error;
-        alert("Đã cập nhật phòng thi thành công!");
-      } else {
-        // Create new room
-        const { error } = await supabase.from("phongthi").insert([
-          {
-            maphong: newRoomData.maphong,
-            tenphong: newRoomData.tenphong,
-            toanha: newRoomData.toanha,
-            succhua: capacity,
-            trangthai: newRoomData.trangthai,
-            ghichu: newRoomData.ghichu,
-          },
-        ]);
-
-        if (error) throw error;
-        alert("Đã tạo phòng thi mới thành công!");
-      }
-
-      // Refresh rooms
-      const { data } = await supabase
-        .from("phongthi")
-        .select(`
-          maphong,
-          tenphong,
-          toanha,
-          succhua,
-          trangthai,
-          ghichu,
-          phieuduthi (
-            sobaodanh,
-            khachhang:makh (
-              thongtinthisinh (hoten),
-              khachhang_cn (hoten)
-            ),
-            thongtinchungchi:macc (tencc)
-          )
-        `);
-      setExamRooms(
-        data.map((room) => ({
-          maphong: room.maphong,
-          tenphong: room.tenphong,
-          toanha: room.toanha,
-          succhua: room.succhua,
-          trangthai: room.trangthai,
-          ghichu: room.ghichu || "",
-          soThiSinhHienTai: room.phieuduthi.length,
-          thiSinh: room.phieuduthi.map((pdt) => ({
-            soBaoDanh: pdt.sobaodanh,
-            hoTen: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-            loaiChungChi: pdt.thongtinchungchi.tencc,
-          })),
-        })),
-      );
-      setIsEditing(false);
-    } catch (err: any) {
-      alert("Lỗi khi lưu phòng thi: " + err.message);
-      console.error("Error saving room:", err);
-    }
+    await saveExamRoom(newRoomData, !!selectedRoom, setExamRooms);
+    setIsEditing(false);
   };
 
   const handleDeleteRoom = async (room: ExamRoom) => {
-    if (room.soThiSinhHienTai > 0) {
-      alert("Không thể xóa phòng thi đã có thí sinh. Vui lòng chuyển thí sinh sang phòng khác trước.");
-      return;
-    }
-
     if (confirm(`Bạn có chắc chắn muốn xóa phòng ${room.tenphong}?`)) {
-      try {
-        const { error } = await supabase.from("phongthi").delete().eq("maphong", room.maphong);
-        if (error) throw error;
-        alert("Đã xóa phòng thi thành công!");
-        setExamRooms(examRooms.filter((r) => r.maphong !== room.maphong));
-      } catch (err: any) {
-        alert("Lỗi khi xóa phòng thi: " + err.message);
-        console.error("Error deleting room:", err);
-      }
+      await deleteExamRoom(room, setExamRooms);
     }
   };
 
   const handleAssignCandidate = async (sobaodanh: string, maphong: string) => {
-    const room = examRooms.find((r) => r.maphong === maphong);
-    if (!room) return;
-
-    if (room.soThiSinhHienTai >= room.succhua) {
-      alert("Phòng thi đã đầy. Không thể thêm thí sinh.");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("phieuduthi")
-        .update({ maphong })
-        .eq("sobaodanh", sobaodanh);
-
-      if (error) throw error;
-
-      // Refresh data
-      const { data: roomsData } = await supabase
-        .from("phongthi")
-        .select(`
-          maphong,
-          tenphong,
-          toanha,
-          succhua,
-          trangthai,
-          ghichu,
-          phieuduthi (
-            sobaodanh,
-            khachhang:makh (
-              thongtinthisinh (hoten),
-              khachhang_cn (hoten)
-            ),
-            thongtinchungchi:macc (tencc)
-          )
-        `);
-      setExamRooms(
-        roomsData.map((r) => ({
-          maphong: r.maphong,
-          tenphong: r.tenphong,
-          toanha: r.toanha,
-          succhua: r.succhua,
-          trangthai: r.trangthai,
-          ghichu: r.ghichu || "",
-          soThiSinhHienTai: r.phieuduthi.length,
-          thiSinh: r.phieuduthi.map((pdt) => ({
-            soBaoDanh: pdt.sobaodanh,
-            hoTen: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-            loaiChungChi: pdt.thongtinchungchi.tencc,
-          })),
-        })),
-      );
-
-      const { data: unassignedData } = await supabase
-        .from("phieuduthi")
-        .select(`
-          sobaodanh,
-          khachhang:makh (
-            thongtinthisinh (hoten),
-            khachhang_cn (hoten)
-          ),
-          thongtinchungchi:macc (tencc)
-        `)
-        .is("maphong", null);
-      setUnassignedCandidates(
-        unassignedData.map((pdt) => ({
-          sobaodanh: pdt.sobaodanh,
-          hoten: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-          tencc: pdt.thongtinchungchi.tencc,
-        })),
-      );
-
-      alert("Đã phân phòng cho thí sinh thành công!");
-    } catch (err: any) {
-      alert("Lỗi khi phân phòng: " + err.message);
-      console.error("Error assigning candidate:", err);
-    }
+    await assignCandidateToRoom(sobaodanh, maphong, examRooms, setExamRooms, setUnassignedCandidates);
   };
 
   const handleRemoveCandidate = async (sobaodanh: string) => {
     if (confirm("Bạn có chắc chắn muốn chuyển thí sinh này sang phòng khác?")) {
-      try {
-        const { error } = await supabase
-          .from("phieuduthi")
-          .update({ maphong: null })
-          .eq("sobaodanh", sobaodanh);
-
-        if (error) throw error;
-
-        // Refresh data
-        const { data: roomsData } = await supabase
-          .from("phongthi")
-          .select(`
-            maphong,
-            tenphong,
-            toanha,
-            succhua,
-            trangthai,
-            ghichu,
-            phieuduthi (
-              sobaodanh,
-              khachhang:makh (
-                thongtinthisinh (hoten),
-                khachhang_cn (hoten)
-              ),
-              thongtinchungchi:macc (tencc)
-            )
-          `);
-        setExamRooms(
-          roomsData.map((r) => ({
-            maphong: r.maphong,
-            tenphong: r.tenphong,
-            toanha: r.toanha,
-            succhua: r.succhua,
-            trangthai: r.trangthai,
-            ghichu: r.ghichu || "",
-            soThiSinhHienTai: r.phieuduthi.length,
-            thiSinh: r.phieuduthi.map((pdt) => ({
-              soBaoDanh: pdt.sobaodanh,
-              hoTen: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-              loaiChungChi: pdt.thongtinchungchi.tencc,
-            })),
-          })),
-        );
-
-        const { data: unassignedData } = await supabase
-          .from("phieuduthi")
-          .select(`
-            sobaodanh,
-            khachhang:makh (
-              thongtinthisinh (hoten),
-              khachhang_cn (hoten)
-            ),
-            thongtinchungchi:macc (tencc)
-          `)
-          .is("maphong", null);
-        setUnassignedCandidates(
-          unassignedData.map((pdt) => ({
-            sobaodanh: pdt.sobaodanh,
-            hoten: pdt.khachhang.thongtinthisinh?.hoten || pdt.khachhang.khachhang_cn?.hoten || "Không có tên",
-            tencc: pdt.thongtinchungchi.tencc,
-          })),
-        );
-
-        alert("Đã chuyển thí sinh sang danh sách chưa phân phòng!");
-      } catch (err: any) {
-        alert("Lỗi khi chuyển thí sinh: " + err.message);
-        console.error("Error removing candidate:", err);
-      }
+      await removeCandidateFromRoom(sobaodanh, setExamRooms, setUnassignedCandidates);
     }
   };
 
@@ -467,6 +156,7 @@ export default function QuanLyPhongThiPage() {
       (filterTrangThai === "all" || room.trangthai === filterTrangThai),
   );
 
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -483,7 +173,7 @@ export default function QuanLyPhongThiPage() {
             <h2 className="text-lg font-semibold">Bộ lọc tìm kiếm</h2>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="toaNha">Tòa nhà</Label>
+                <Label htmlFor="toa_fftNha">Tòa nhà</Label>
                 <Select value={filterToaNha} onValueChange={setFilterToaNha}>
                   <SelectTrigger id="toaNha">
                     <SelectValue placeholder="Chọn tòa nhà" />
@@ -554,7 +244,6 @@ export default function QuanLyPhongThiPage() {
         </CardHeader>
         <CardContent>
           {loading && <p>Đang tải dữ liệu...</p>}
-          {error && <p className="text-red-500">{error}</p>}
           {!loading && filteredRooms.length === 0 && <p>Không có phòng thi nào phù hợp với bộ lọc.</p>}
           {!loading && filteredRooms.length > 0 && (
             <div className="rounded-md border">
@@ -700,20 +389,14 @@ export default function QuanLyPhongThiPage() {
                                         </Button>
                                         <Button
                                           variant={selectedRoom.trangthai === "maintenance" ? "default" : "outline"}
-                                          onClick={async () => {
-                                            const newStatus =
-                                              selectedRoom.trangthai === "maintenance" ? "available" : "maintenance";
-                                            await supabase
-                                              .from("phongthi")
-                                              .update({ trangthai: newStatus })
-                                              .eq("maphong", selectedRoom.maphong);
-                                            setSelectedRoom({ ...selectedRoom, trangthai: newStatus });
-                                            alert(
-                                              newStatus === "maintenance"
-                                                ? "Đã đánh dấu phòng đang bảo trì!"
-                                                : "Đã kết thúc bảo trì!",
-                                            );
-                                          }}
+                                          onClick={() =>
+                                            updateRoomStatus(
+                                              selectedRoom.maphong,
+                                              selectedRoom.trangthai === "maintenance" ? "available" : "maintenance",
+                                              setSelectedRoom,
+                                              selectedRoom,
+                                            )
+                                          }
                                           className="gap-2"
                                         >
                                           {selectedRoom.trangthai === "maintenance" ? (
@@ -832,7 +515,7 @@ export default function QuanLyPhongThiPage() {
                             onClick={() => handleDeleteRoom(room)}
                             disabled={room.soThiSinhHienTai > 0}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />                          
                           </Button>
                         </div>
                       </TableCell>
@@ -851,7 +534,7 @@ export default function QuanLyPhongThiPage() {
             <CardTitle>Thí sinh chưa phân phòng</CardTitle>
             <Button
               className="gap-2"
-              onClick={() => alert("Chức năng phân phòng hàng loạt chưa được triển khai!")}
+              onClick={() => toast.info("Chức năng phân phòng hàng loạt chưa được triển khai!")}
             >
               <UserPlus className="h-4 w-4" />
               Phân phòng hàng loạt

@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ExamTicketSearch from "@/components/exam-ticket-search";
 import ExtensionForm from "@/components/extension-form";
-import { TicketInfo, createExtension } from "@/lib/extensionService";
 import { toast } from "@/components/ui/use-toast";
-
+import { TicketInfo } from "@/types/RegistrationTypes";
+import { createExtension } from "@/services/phieuDangKiGiaHanService";
 export default function GiaHanPage() {
   const [ticketinfo, setTicketInfo] = useState<TicketInfo | null>(null);
   const [formdata, setFormData] = useState<{

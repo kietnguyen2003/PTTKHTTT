@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Search, AlertCircle } from "lucide-react";
-import { searchExamTicket, TicketInfo } from "@/lib/extensionService";
 import { toast } from "@/components/ui/use-toast";
+import { TicketInfo } from "@/types/RegistrationTypes";
+import { searchExamTicket } from "@/services/phieuDuThiService";
 
 export default function ExamTicketSearch({ onTicketFound }: { onTicketFound: (ticket: TicketInfo | null) => void }) {
   const [ticketid, setTicketId] = useState("");
