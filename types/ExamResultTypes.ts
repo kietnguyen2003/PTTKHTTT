@@ -1,7 +1,6 @@
-// types/ExamResultTypes.ts
 export enum ChungChiStatus {
-  ChuaNhan = 'ChuaNhan',
-  DaNhan = 'DaNhan',
+  ChuaNhan = "ChuaNhan",
+  DaNhan = "DaNhan",
 }
 
 export interface CandidateInfo {
@@ -20,17 +19,33 @@ export interface ResultData {
   trangThai: ChungChiStatus;
 }
 
+export interface KhachHang {
+  thongtinthsinh?: { hoten: string };
+  khachhang_cn?: { hoten: string };
+}
+
+export interface ThongTinChungChi {
+  tencc: string;
+}
+
+export interface KetQuaThi {
+  diemthi: number;
+  nguoicham: string;
+  giamthi: string;
+}
+
+export interface BangTinh {
+  trangthai: string;
+}
+
 export interface PhieuDuThi {
-  maphieu: string;
   sobaodanh: string;
+  maphieu: string;
+  status: string;
   thoigian: string;
   diadiem: string;
-  thongtinchungchi: {
-    tencc: string;
-  };
-  khachhang: {
-    thongtinthisinh?: { hoten: string };
-    khachhang_cn?: { hoten: string };
-  };
-  status: string;
+  thongtinchungchi: ThongTinChungChi;
+  khachhang?: KhachHang;
+  ketquathi?: KetQuaThi;
+  bangtinh?: BangTinh;
 }

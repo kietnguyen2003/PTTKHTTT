@@ -2,7 +2,7 @@
 import { DateList } from "@/types/DateTypes";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
-import { ExamSchedule } from "@/types/ExamDetails";
+import { ExamSchedule } from "@/types/ExamTypes";
 
 // lấy danh sách buổi thi
 export async function fetchDateList(setDateList: (dates: DateList[]) => void) {

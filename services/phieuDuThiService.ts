@@ -2,10 +2,68 @@ import { TicketInfo } from "@/types/RegistrationTypes";
 import { supabase } from "../lib/supabase/supabaseClient";
 import { PhieuDuThi } from "@/types/ExamResultTypes";
 
+// Lấy danh sách kết quả thi từ bảng ketquathi
+export const fetchKetQuaThi = async (
+  setKetQuaThiList: (list: PhieuDuThi[]) => void
+) => {
+  try {
+    const query = supabase
+      .from("ketquathi")
+      .select(`
+        sobaodanh,
+        diemthi,
+        nguoicham,
+        giamthi,
+        phieuduthi:sobaodanh (
+          maphieu,
+          status,
+          buoithi:mabuoithi (thoigian, diadiem),
+          thongtinchungchi:macc (tencc),
+          thongtinthsinh:mats (hoten),
+          khachhang:makh (
+            khachhang_cn (hoten)
+          )
+        )
+      `);
+
+    const { data, error } = await query;
+
+    console.log("Raw ketquathi data:", data);
+    if (error) throw error;
+
+    const transformedData: PhieuDuThi[] = (Array.isArray(data) ? data : []).map((item: any) => ({
+      sobaodanh: item.sobaodanh,
+      maphieu: item.phieuduthi?.maphieu || '',
+      status: item.phieuduthi?.status || '',
+      thoigian: item.phieuduthi?.buoithi?.thoigian || '',
+      diadiem: item.phieuduthi?.buoithi?.diadiem || '',
+      thongtinchungchi: {
+        tencc: item.phieuduthi?.thongtinchungchi?.tencc || ''
+      },
+      khachhang: {
+        thongtinthsinh: item.phieuduthi?.thongtinthsinh ? { hoten: item.phieuduthi.thongtinthsinh.hoten || 'N/A' } : undefined,
+        khachhang_cn: item.phieuduthi?.khachhang?.khachhang_cn ? { hoten: item.phieuduthi.khachhang.khachhang_cn.hoten || 'N/A' } : undefined
+      },
+      ketquathi: {
+        diemthi: item.diemthi || 0,
+        nguoicham: item.nguoicham || '',
+        giamthi: item.giamthi || ''
+      },
+      bangtinh: undefined
+    }));
+
+    console.log("Transformed ketquathi data:", transformedData);
+    setKetQuaThiList(transformedData);
+  } catch (error: any) {
+    console.error("Error fetching ketquathi:", error.message);
+    throw new Error("Lỗi khi tải danh sách kết quả thi: " + error.message);
+  }
+};
+
 // Lấy danh sách phiếu dự thi
 export const fetchPhieuDuThi = async (
   setPhieuDuThiList: (list: PhieuDuThi[]) => void,
-  statusFilter: 'chua_thi' | 'all' = 'chua_thi'
+  fetchType: 'chua_thi' = 'chua_thi'
 ) => {
   try {
     let query = supabase
@@ -20,23 +78,18 @@ export const fetchPhieuDuThi = async (
         khachhang:makh (
           khachhang_cn (hoten)
         )
-      `);
-    if (statusFilter === 'chua_thi') {
-      query = query.eq('status', 'chua_thi');
-    } else {
-      query = query.eq('status', 'da_thi');
-    }
-    console.log("Status filter: ", statusFilter);
+      `)
+      .eq('status', 'chua_thi');
+
     const { data, error } = await query;
 
-    console.log("Raw data:", data);
+    console.log("Raw phieuduthi data:", data);
     if (error) throw error;
 
     const transformedData: PhieuDuThi[] = (Array.isArray(data) ? data : []).map((item: any) => ({
       sobaodanh: item.sobaodanh,
       maphieu: item.maphieu,
       status: item.status,
-      createdAt: new Date(item.created_at).toLocaleString("vi-VN"),
       thoigian: item.buoithi?.thoigian || '',
       diadiem: item.buoithi?.diadiem || '',
       thongtinchungchi: {
@@ -45,10 +98,12 @@ export const fetchPhieuDuThi = async (
       khachhang: {
         thongtinthsinh: item.thongtinthsinh ? { hoten: item.thongtinthsinh.hoten || 'N/A' } : undefined,
         khachhang_cn: item.khachhang?.khachhang_cn ? { hoten: item.khachhang.khachhang_cn.hoten || 'N/A' } : undefined
-      }
+      },
+      ketquathi: undefined,
+      bangtinh: undefined
     }));
 
-    console.log("Transformed data:", transformedData);
+    console.log("Transformed phieuduthi data:", transformedData);
     setPhieuDuThiList(transformedData);
   } catch (error: any) {
     console.error("Error fetching phieuduthi:", error.message);
@@ -71,7 +126,7 @@ export const updatePhieuDuThiStatusBasic = async (
     if (error) throw error;
 
     // Tải lại danh sách phiếu dự thi
-    await fetchPhieuDuThi(setPhieuDuThiList, 'all');
+    await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
   } catch (error: any) {
     console.error("Error updating phieuduthi status:", error.message);
     throw new Error("Lỗi khi cập nhật trạng thái phiếu dự thi: " + error.message);
@@ -92,7 +147,7 @@ export const deletePhieuDuThi = async (
     if (error) throw error;
 
     // Tải lại danh sách phiếu dự thi
-    await fetchPhieuDuThi(setPhieuDuThiList, 'all');
+    await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
   } catch (error: any) {
     console.error("Error deleting phieuduthi:", error.message);
     throw new Error("Lỗi khi xóa phiếu dự thi: " + error.message);
@@ -173,4 +228,4 @@ export async function searchExamTicket(ticketid: string, candidatenumber: string
     }),
     examlocation: data.buoithi?.diadiem,
   };
-}
+};

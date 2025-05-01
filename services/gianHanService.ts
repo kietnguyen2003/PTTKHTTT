@@ -21,14 +21,8 @@ export async function getExtensionCount(ticketId: string): Promise<number> {
 }
 
 // Tạo phiếu gia hạn
-export async function createExtension({
-  ticketId,
-  customerId,
-  newExamSessionId,
-  reason,
-  otherReason,
-  staffId,
-  specialCase,
+export async function createExtension(ticketid: string, customerid: string, newexamid: string, selectedreason: string, otherreason: string, staffid: string, specialcase: boolean, {
+  ticketId, customerId, newExamSessionId, reason, otherReason, staffId, specialCase,
 }: ExamExtensionFormData): Promise<void> {
   const extensionId = uuidv4();
   const finalReason = reason === "other" ? otherReason : reason;
@@ -40,7 +34,7 @@ export async function createExtension({
   }
 
   // Tạo phiếu gia hạn
-  const { error } = await supabase.from("PhieuDangKiGiaHan").insert({
+  const { error } = await supabase.from("phieudangkigiahan").insert({
     MaPhieu: extensionId,
     MaKH: customerId,
     MaPhieuDuThi: ticketId,

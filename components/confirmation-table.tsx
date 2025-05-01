@@ -1,9 +1,11 @@
 // src/components/confirmation-table.tsx
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Customer } from "@/lib/customerService"
 import { supabase } from "@/lib/supabase/supabaseClient"
-import { CertificateDetails, ExamDetails, RegistrationData } from "@/lib/certificateService";
+import { RegistrationData } from "@/types/RegistrationTypes";
+import { Customer } from "@/types/CustomerTypes";
+import { ExamDetails } from "@/types/ExamTypes";
+import { CertificateDetails } from "@/types/CertificateTypes";
 
 
 

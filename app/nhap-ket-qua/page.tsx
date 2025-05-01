@@ -10,13 +10,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Save, RotateCcw, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
-import { fetchPhieuDuThi } from "@/services/phieuDuThiService";
+import { fetchPhieuDuThi, fetchKetQuaThi } from "@/services/phieuDuThiService";
 import { saveExamResults } from "@/services/ketQuaThiService";
 import { CandidateInfo, ChungChiStatus, PhieuDuThi, ResultData } from "@/types/ExamResultTypes";
 import { updatePhieuDuThiStatus } from "@/services/phieuDangKiService";
 
 export default function NhapKetQuaPage() {
   const [phieuDuThiList, setPhieuDuThiList] = useState<PhieuDuThi[]>([]);
+  const [ketQuaThiList, setKetQuaThiList] = useState<PhieuDuThi[]>([]);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateInfo | null>(null);
   const [resultData, setResultData] = useState<ResultData>({
     diemThi: "",
@@ -29,17 +30,20 @@ export default function NhapKetQuaPage() {
   const [saving, setSaving] = useState<boolean>(false);
 
   useEffect(() => {
-    async function loadPhieuDuThi() {
+    async function loadData() {
       try {
         setLoading(true);
-        await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
+        await Promise.all([
+          fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi'),
+          fetchKetQuaThi(setKetQuaThiList),
+        ]);
       } catch (error: any) {
         setError(error.message);
       } finally {
         setLoading(false);
       }
     }
-    loadPhieuDuThi();
+    loadData();
   }, []);
 
   const handleSelectCandidate = (phieu: PhieuDuThi) => {
@@ -83,10 +87,8 @@ export default function NhapKetQuaPage() {
     }
 
     try {
-      // Cập nhật status của phiếu dự thi thành đã thi
       await updatePhieuDuThiStatus(selectedCandidate!.maPhieuDuThi, "da_thi");
 
-      // Lưu kết quả thi
       await saveExamResults(
         selectedCandidate!.soBaoDanh,
         score,
@@ -95,10 +97,11 @@ export default function NhapKetQuaPage() {
         resultData.trangThai
       );
 
-      // Tải lại danh sách phiếu dự thi
-      await fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi');
+      await Promise.all([
+        fetchPhieuDuThi(setPhieuDuThiList, 'chua_thi'),
+        fetchKetQuaThi(setKetQuaThiList),
+      ]);
 
-      // Hiển thị thông báo thành công
       toast.success("Đã lưu kết quả thi thành công!");
       handleReset();
     } catch (error: any) {
@@ -132,7 +135,7 @@ export default function NhapKetQuaPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Danh sách phiếu dự thi</h2>
+            <h2 className="text-lg font-semibold">Danh sách phiếu dự thi chưa thi</h2>
             {loading && <p>Đang tải dữ liệu...</p>}
             {error && (
               <Alert variant="destructive">
@@ -292,6 +295,52 @@ export default function NhapKetQuaPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Danh sách kết quả thi đã nhập</h2>
+            {loading && <p>Đang tải dữ liệu...</p>}
+            {!loading && ketQuaThiList.length === 0 && <p>Không có kết quả thi nào.</p>}
+            {!loading && ketQuaThiList.length > 0 && (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Số báo danh</TableHead>
+                      <TableHead>Mã phiếu</TableHead>
+                      <TableHead>Họ tên</TableHead>
+                      <TableHead>Loại chứng chỉ</TableHead>
+                      <TableHead>Điểm thi</TableHead>
+                      <TableHead>Người chấm</TableHead>
+                      <TableHead>Giám thị</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ketQuaThiList.map((phieu) => (
+                      <TableRow key={phieu.sobaodanh}>
+                        <TableCell>{phieu.sobaodanh}</TableCell>
+                        <TableCell>{phieu.maphieu}</TableCell>
+                        <TableCell>
+                          {phieu.khachhang?.thongtinthsinh?.hoten ||
+                            phieu.khachhang?.khachhang_cn?.hoten ||
+                            "Không có tên"}
+                        </TableCell>
+                        <TableCell>{phieu.thongtinchungchi.tencc}</TableCell>
+                        <TableCell>{phieu.ketquathi?.diemthi || "N/A"}</TableCell>
+                        <TableCell>{phieu.ketquathi?.nguoicham || "N/A"}</TableCell>
+                        <TableCell>{phieu.ketquathi?.giamthi || "N/A"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      
     </div>
   );
 }
